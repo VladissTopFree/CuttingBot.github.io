@@ -599,20 +599,22 @@
     position:fixed;
     inset:0;
     z-index:1200;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    opacity:0;
     pointer-events:none;
-    transition:opacity 0.28s ease;
+    touch-action:none;
   }
-  .image-viewer.visible{
-    opacity:1;
-    pointer-events:auto;
-  }
+  .image-viewer.visible{ pointer-events:auto; }
+
   .image-viewer-backdrop{
     position:absolute;
     inset:0;
+    background:rgba(8,8,10,0);
+    -webkit-backdrop-filter:blur(0px);
+    backdrop-filter:blur(0px);
+    transition:background-color 0.34s ease,
+               -webkit-backdrop-filter 0.34s ease,
+               backdrop-filter 0.34s ease;
+  }
+  .image-viewer.visible .image-viewer-backdrop{
     background:rgba(8,8,10,0.72);
     -webkit-backdrop-filter:blur(26px);
     backdrop-filter:blur(26px);
@@ -620,20 +622,69 @@
   .image-viewer-content{
     position:relative;
     max-width:calc(100% - 48px);
-    max-height:calc(100% - 96px);
-    transform:scale(0.92);
-    transition:transform 0.28s ease;
+    max-height:calc(100% - 140px);
+    transform-origin:center center;
+    will-change:transform;
   }
+  .image-viewer-stage{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    opacity:0;
+    transform:scale(0.94);
+    transition:opacity 0.30s ease, transform 0.30s ease;
+    overflow:hidden;
+  }
+  .image-viewer.visible .image-viewer-stage{ opacity:1; transform:scale(1); }
   .image-viewer.visible .image-viewer-content{ transform:scale(1); }
   .image-viewer-content img{
     display:block;
     width:100%;
     height:100%;
     max-width:100%;
-    max-height:calc(100vh - 96px - var(--safe-top) - var(--safe-bottom));
+    max-height:calc(var(--vh) - 140px - var(--safe-top) - var(--safe-bottom));
     object-fit:contain;
-    border-radius:20px;
-    box-shadow:0 24px 64px rgba(0,0,0,0.55);
+    background:transparent;
+    border-radius:0;
+    box-shadow:none;
+  }
+
+  .image-viewer-zoom{
+    position:absolute;
+    left:50%;
+    bottom:calc(var(--safe-bottom) + 26px);
+    transform:translateX(-50%);
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:6px;
+    border-radius:999px;
+    background:rgba(20,20,23,0.72);
+    -webkit-backdrop-filter:blur(12px);
+    backdrop-filter:blur(12px);
+    opacity:0;
+    transition:opacity 0.30s ease;
+  }
+
+  .image-viewer.visible .image-viewer-zoom{ opacity:1; }
+  .image-viewer-zoom button{
+    width:42px; height:42px;
+    border:none;
+    border-radius:50%;
+    background:rgba(255,255,255,0.10);
+    color:#ffffff;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .image-viewer-zoom button:active{ opacity:0.7; }
+  .image-viewer-zoom button:disabled{ opacity:0.3; }
+  .image-viewer-scale{
+    min-width:56px;
+    text-align:center;
+    color:var(--text-secondary);
+    font-size:13px;
+    font-weight:600;
   }
 
   #screen-loading{
@@ -815,8 +866,19 @@
   <!-- Полноэкранный просмотр картинки -->
   <div id="image-viewer" class="image-viewer hidden">
     <div class="image-viewer-backdrop"></div>
-    <div class="image-viewer-content">
-      <img id="image-viewer-img" src="" alt="">
+    <div class="image-viewer-stage">
+      <div class="image-viewer-content" id="image-viewer-content">
+        <img id="image-viewer-img" src="" alt="" draggable="false">
+      </div>
+    </div>
+    <div class="image-viewer-zoom" id="image-viewer-zoom">
+      <button type="button" data-zoom="out" aria-label="Меньше">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <span class="image-viewer-scale" id="image-viewer-scale">100%</span>
+      <button type="button" data-zoom="in" aria-label="Больше">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
     </div>
   </div>
 
@@ -1456,17 +1518,80 @@
     closeModals();
   }
 
-  // ============================================================
+// ============================================================
   //  Полноэкранный просмотр картинки (лайтбокс)
+  //  Поддерживает зум кнопками, щипком (pinch), двойным тапом
+  //  и перетаскивание увеличенной картинки пальцем.
   // ============================================================
 
   var imageViewerEl = document.getElementById('image-viewer');
   var imageViewerImg = document.getElementById('image-viewer-img');
+  var imageViewerContent = document.getElementById('image-viewer-content');
+  var imageViewerZoomBar = document.getElementById('image-viewer-zoom');
+  var imageViewerScaleLabel = document.getElementById('image-viewer-scale');
+
+  var IV_MIN_SCALE = 1;
+  var IV_MAX_SCALE = 6;
+
+  var ivScale = 1, ivTx = 0, ivTy = 0;
+  var ivMode = null;              // 'pan' | 'pinch'
+  var ivStartDist = 0, ivStartScale = 1;
+  var ivStartX = 0, ivStartY = 0, ivStartTx = 0, ivStartTy = 0;
+  var ivMoved = false;
+  var ivLastTap = 0, ivTapTimer = null;
+
+  function ivClampOffsets(){
+    if (ivScale <= 1){ ivTx = 0; ivTy = 0; return; }
+    var w = imageViewerContent.offsetWidth * ivScale;
+    var h = imageViewerContent.offsetHeight * ivScale;
+    var maxX = Math.max(0, (w - window.innerWidth) / 2);
+    var maxY = Math.max(0, (h - window.innerHeight) / 2);
+    ivTx = Math.min(maxX, Math.max(-maxX, ivTx));
+    ivTy = Math.min(maxY, Math.max(-maxY, ivTy));
+  }
+
+  function ivApply(animate){
+    ivClampOffsets();
+    imageViewerContent.style.transition = animate ? 'transform 0.22s ease' : 'none';
+    imageViewerContent.style.transform =
+      'translate(' + ivTx + 'px,' + ivTy + 'px) scale(' + ivScale + ')';
+    if (imageViewerScaleLabel){
+      imageViewerScaleLabel.textContent = Math.round(ivScale * 100) + '%';
+    }
+    var btns = imageViewerZoomBar ? imageViewerZoomBar.querySelectorAll('[data-zoom]') : [];
+    for (var i = 0; i < btns.length; i++){
+      var dir = btns[i].getAttribute('data-zoom');
+      btns[i].disabled = (dir === 'in' && ivScale >= IV_MAX_SCALE - 0.001) ||
+                         (dir === 'out' && ivScale <= IV_MIN_SCALE + 0.001);
+    }
+  }
+
+  // Зум с сохранением точки под пальцем (px, py — координаты на экране).
+  function ivZoomTo(newScale, px, py, animate){
+    newScale = Math.min(IV_MAX_SCALE, Math.max(IV_MIN_SCALE, newScale));
+    if (typeof px !== 'number') px = window.innerWidth / 2;
+    if (typeof py !== 'number') py = window.innerHeight / 2;
+    var mx = px - window.innerWidth / 2;
+    var my = py - window.innerHeight / 2;
+    var k = newScale / ivScale;
+    ivTx = mx - (mx - ivTx) * k;
+    ivTy = my - (my - ivTy) * k;
+    ivScale = newScale;
+    if (ivScale <= 1){ ivTx = 0; ivTy = 0; }
+    ivApply(animate !== false);
+  }
+
+  function ivReset(){
+    ivScale = 1; ivTx = 0; ivTy = 0;
+    ivMode = null; ivMoved = false;
+    ivApply(false);
+  }
 
   function openImageViewerWithUrl(url){
     imageViewerImg.src = url;
     imageViewerEl.classList.remove('hidden');
-    // Форсируем перерасчёт стилей, чтобы плавный переход прозрачности сыграл заново.
+    ivReset();
+    // Форсируем перерасчёт стилей, чтобы переходы сыграли заново.
     void imageViewerEl.offsetWidth;
     imageViewerEl.classList.add('visible');
     imageViewerOpenState = true;
@@ -1478,7 +1603,8 @@
     setTimeout(function(){
       imageViewerEl.classList.add('hidden');
       imageViewerImg.src = '';
-    }, 280);
+      ivReset();
+    }, 340);
   }
 
   function openImageViewerForId(id){
@@ -1496,8 +1622,113 @@
     }).catch(function(){});
   }
 
+  function ivDist(t1, t2){
+    var dx = t1.clientX - t2.clientX;
+    var dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
   if (imageViewerEl){
-    imageViewerEl.addEventListener('click', function(){ closeImageViewer(); });
+    imageViewerEl.addEventListener('touchstart', function(e){
+      if (e.target.closest && e.target.closest('#image-viewer-zoom')) return;
+      if (e.touches.length === 2){
+        ivMode = 'pinch';
+        ivMoved = true;
+        ivStartDist = ivDist(e.touches[0], e.touches[1]);
+        ivStartScale = ivScale;
+        ivStartTx = ivTx; ivStartTy = ivTy;
+        ivStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        ivStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      } else if (e.touches.length === 1){
+        ivMode = 'pan';
+        ivMoved = false;
+        ivStartX = e.touches[0].clientX;
+        ivStartY = e.touches[0].clientY;
+        ivStartTx = ivTx; ivStartTy = ivTy;
+      }
+    }, { passive:true });
+
+    imageViewerEl.addEventListener('touchmove', function(e){
+      if (!ivMode) return;
+      if (e.cancelable) e.preventDefault();
+
+      if (ivMode === 'pinch' && e.touches.length === 2){
+        var dist = ivDist(e.touches[0], e.touches[1]);
+        if (!ivStartDist) return;
+        var target = Math.min(IV_MAX_SCALE, Math.max(IV_MIN_SCALE, ivStartScale * (dist / ivStartDist)));
+        var mx = ivStartX - window.innerWidth / 2;
+        var my = ivStartY - window.innerHeight / 2;
+        var k = target / ivStartScale;
+        ivTx = mx - (mx - ivStartTx) * k;
+        ivTy = my - (my - ivStartTy) * k;
+        // Смещение середины между пальцами — двигаем картинку вместе с ними.
+        var curMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        var curMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        ivTx += curMidX - ivStartX;
+        ivTy += curMidY - ivStartY;
+        ivScale = target;
+        if (ivScale <= 1){ ivTx = 0; ivTy = 0; }
+        ivApply(false);
+        return;
+      }
+
+      if (ivMode === 'pan' && e.touches.length === 1){
+        var dx = e.touches[0].clientX - ivStartX;
+        var dy = e.touches[0].clientY - ivStartY;
+        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) ivMoved = true;
+        if (ivScale > 1){
+          ivTx = ivStartTx + dx;
+          ivTy = ivStartTy + dy;
+          ivApply(false);
+        }
+      }
+    }, { passive:false });
+
+    imageViewerEl.addEventListener('touchend', function(e){
+      if (e.target.closest && e.target.closest('#image-viewer-zoom')) return;
+      if (e.touches.length > 0){ return; }
+
+      var wasMode = ivMode;
+      ivMode = null;
+      if (ivScale <= 1){ ivTx = 0; ivTy = 0; ivApply(true); }
+
+      if (wasMode !== 'pan' || ivMoved) return;
+
+      var touch = e.changedTouches[0];
+      var now = Date.now();
+      if (now - ivLastTap < 280){
+        // Двойной тап: увеличить / вернуть исходный размер.
+        clearTimeout(ivTapTimer);
+        ivLastTap = 0;
+        if (ivScale > 1.01){ ivZoomTo(1, touch.clientX, touch.clientY, true); }
+        else { ivZoomTo(2.5, touch.clientX, touch.clientY, true); }
+      } else {
+        ivLastTap = now;
+        var onBackdrop = e.target.classList && e.target.classList.contains('image-viewer-backdrop');
+        ivTapTimer = setTimeout(function(){
+          // Одиночный тап закрывает просмотр, если картинка не увеличена
+          // (или если тап пришёлся мимо картинки — по затемнению).
+          if (ivScale <= 1.01 || onBackdrop) closeImageViewer();
+        }, 290);
+      }
+    }, { passive:true });
+
+    // Колесо мыши — для десктопа.
+    imageViewerEl.addEventListener('wheel', function(e){
+      e.preventDefault();
+      ivZoomTo(ivScale * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX, e.clientY, false);
+    }, { passive:false });
+  }
+
+  if (imageViewerZoomBar){
+    imageViewerZoomBar.addEventListener('click', function(e){
+      var btn = e.target.closest ? e.target.closest('[data-zoom]') : null;
+      if (!btn || btn.disabled) return;
+      e.stopPropagation();
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      var dir = btn.getAttribute('data-zoom');
+      ivZoomTo(dir === 'in' ? ivScale * 1.4 : ivScale / 1.4, undefined, undefined, true);
+    });
   }
 
   // ============================================================
