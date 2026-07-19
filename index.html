@@ -1,1 +1,242 @@
-//
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Bot</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#1b1b1e;
+    --card-bg:#183643;
+    --accent:#00a6cf;
+    --text-primary:#f5f6f6;
+    --text-secondary:#b7c1c5;
+    --btn-cut-bg:#183524;
+    --btn-cut-text:#00ad3e;
+    --btn-create-bg:#173643;
+    --btn-create-text:#00a6cf;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --vh: 100vh;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html, body{
+    margin:0;
+    padding:0;
+    width:100%;
+    background:var(--bg);
+    color:var(--text-primary);
+    font-family:"SF Pro Text",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+
+  html{
+    height:100%;
+    overscroll-behavior:none;
+  }
+
+  body{
+    height:var(--vh);
+    overflow:hidden;
+    overscroll-behavior:none;
+    touch-action:none;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  img, a, button{ -webkit-user-drag:none; }
+
+  .screen{
+    display:none;
+    flex-direction:column;
+    height:var(--vh);
+    width:100%;
+    padding-top:calc(var(--safe-top) + 16px);
+    padding-bottom:calc(var(--safe-bottom) + 20px);
+    padding-left:calc(var(--safe-left) + 18px);
+    padding-right:calc(var(--safe-right) + 18px);
+  }
+  .screen.active{ display:flex; }
+
+  .blockquote{
+    position:relative;
+    background:var(--card-bg);
+    border-radius:14px;
+    padding:16px 20px 16px 28px;
+    color:var(--text-secondary);
+    font-size:16px;
+    line-height:1.48;
+    overflow:hidden;
+  }
+  .blockquote::before{
+    content:"";
+    position:absolute;
+    left:10px; top:10px; bottom:10px;
+    width:4px;
+    border-radius:4px;
+    background:var(--accent);
+  }
+  .blockquote b{ color:var(--text-primary); font-weight:600; }
+
+  /* --- Экран отказа в доступе --- */
+  #screen-denied .blockquote{
+    font-size:18px;
+    color:#dde3e5;
+  }
+
+  /* --- Главное меню --- */
+  #screen-menu h1{
+    font-size:26px;
+    font-weight:700;
+    margin:4px 0 16px;
+    color:#ffffff;
+  }
+  #screen-menu .buttons{
+    margin-top:auto;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .btn{
+    border:none;
+    width:100%;
+    padding:21px 0;
+    border-radius:22px;
+    font-size:17px;
+    font-weight:700;
+    letter-spacing:0.4px;
+    text-transform:uppercase;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+  .btn:active{ opacity:0.85; }
+  .btn-cut{ background:var(--btn-cut-bg); color:var(--btn-cut-text); }
+  .btn-create{ background:var(--btn-create-bg); color:var(--btn-create-text); }
+
+  #screen-loading{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:var(--vh);
+    color:#555;
+    font-size:14px;
+  }
+</style>
+</head>
+<body oncontextmenu="return false;">
+
+  <div id="screen-loading"></div>
+
+  <div id="screen-denied" class="screen">
+    <div class="blockquote">Private bot for a select group of people.</div>
+  </div>
+
+  <div id="screen-menu" class="screen">
+    <h1>Главное меню</h1>
+    <div class="blockquote">
+      Это главное меню бота. При нажатии на кнопку <b>«Вырезать»</b> вы можете вырезать нужный фрагмент из скриншота, скачать его или добавить в работу. Кнопка <b>«Создать»</b> позволяет выбрать всех вырезанных персонажей и добавить их в проект, который в дальнейшем можно редактировать. Кнопка <b>«Сохранённые»</b> позволяет легко вернуться к шаблону недавней работы.
+    </div>
+    <div class="buttons">
+      <button class="btn btn-cut" id="btn-cut" type="button">Вырезать</button>
+      <button class="btn btn-create" id="btn-create" type="button">Создать</button>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ID пользователя, которому разрешён доступ к боту.
+  var ALLOWED_USER_ID = 1781692500;
+
+  var tg = window.Telegram ? window.Telegram.WebApp : null;
+
+  function show(id){
+    document.getElementById('screen-loading').style.display = 'none';
+    var screens = document.querySelectorAll('.screen');
+    for (var i = 0; i < screens.length; i++){ screens[i].classList.remove('active'); }
+    document.getElementById(id).classList.add('active');
+  }
+
+  function syncViewportHeight(){
+    var h = (tg && tg.viewportStableHeight) ? tg.viewportStableHeight : window.innerHeight;
+    document.documentElement.style.setProperty('--vh', h + 'px');
+  }
+
+  function syncSafeArea(){
+    if (tg && tg.contentSafeAreaInset){
+      document.documentElement.style.setProperty('--safe-top', (tg.contentSafeAreaInset.top || 0) + 'px');
+      document.documentElement.style.setProperty('--safe-bottom', (tg.contentSafeAreaInset.bottom || 0) + 'px');
+      document.documentElement.style.setProperty('--safe-left', (tg.contentSafeAreaInset.left || 0) + 'px');
+      document.documentElement.style.setProperty('--safe-right', (tg.contentSafeAreaInset.right || 0) + 'px');
+    }
+  }
+
+  if (tg){
+    tg.ready();
+
+    // Полноэкранный режим, без учёта темы Telegram — цвета зашиты в CSS.
+    try { tg.expand(); } catch(e){}
+    try { tg.requestFullscreen(); } catch(e){}
+    try { tg.disableVerticalSwipes(); } catch(e){}
+    try { tg.setBackgroundColor('#1b1b1e'); } catch(e){}
+    try { tg.setHeaderColor('#1b1b1e'); } catch(e){}
+    try { tg.setBottomBarColor && tg.setBottomBarColor('#1b1b1e'); } catch(e){}
+
+    if (tg.onEvent){
+      tg.onEvent('viewportChanged', syncViewportHeight);
+      tg.onEvent('fullscreenChanged', syncSafeArea);
+      tg.onEvent('safeAreaChanged', syncSafeArea);
+    }
+    syncViewportHeight();
+    syncSafeArea();
+
+    var userId = tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id;
+    show(userId === ALLOWED_USER_ID ? 'screen-menu' : 'screen-denied');
+  } else {
+    // Открыто вне Telegram — по умолчанию показываем экран отказа.
+    show('screen-denied');
+  }
+
+  // --- Блокировка жестов: пинч-зум, двойной тап, выделение, копирование, protyagivanie экрана ---
+  document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, { passive:false });
+  document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, { passive:false });
+  document.addEventListener('touchmove', function(e){
+    if (e.touches && e.touches.length > 1){ e.preventDefault(); }
+  }, { passive:false });
+
+  var lastTouchEnd = 0;
+  document.addEventListener('touchend', function(e){
+    var now = Date.now();
+    if (now - lastTouchEnd <= 300){ e.preventDefault(); }
+    lastTouchEnd = now;
+  }, { passive:false });
+
+  document.addEventListener('selectstart', function(e){ e.preventDefault(); });
+  document.addEventListener('copy', function(e){ e.preventDefault(); });
+  document.addEventListener('dragstart', function(e){ e.preventDefault(); });
+
+  // --- Заглушки под будущую логику кнопок ---
+  var btnCut = document.getElementById('btn-cut');
+  var btnCreate = document.getElementById('btn-create');
+  if (btnCut){
+    btnCut.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      // TODO: экран "Вырезать"
+    });
+  }
+  if (btnCreate){
+    btnCreate.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      // TODO: экран "Создать"
+    });
+  }
+})();
+</script>
+</body>
+</html>
