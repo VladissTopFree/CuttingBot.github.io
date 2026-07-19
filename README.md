@@ -1,1 +1,1 @@
-# CuttingBot.github.io
+Bot
