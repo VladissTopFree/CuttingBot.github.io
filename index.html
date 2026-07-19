@@ -138,6 +138,7 @@
   /* --- Экран «Все вырезки» --- */
   #screen-cuts{ padding-bottom:0; }
   #screen-folder-picker{ padding-bottom:0; }
+  #screen-folders{ padding-bottom:0; }
 
   .cuts-header{ flex-shrink:0; }
 
@@ -169,6 +170,7 @@
     white-space:nowrap;
   }
   .pill-btn-danger{ background:var(--btn-delete-bg); color:var(--btn-delete-text); }
+  .pill-btn-success{ background:var(--btn-cut-bg); color:var(--btn-cut-text); }
   .icon-btn{
     flex-shrink:0;
     width:40px; height:40px;
@@ -244,10 +246,18 @@
   }
   .cuts-scroll::-webkit-scrollbar{ display:none; width:0; height:0; }
 
+  #screen-folders .cuts-scroll{
+    padding-bottom:calc(var(--safe-bottom) + 20px);
+  }
+
   .cuts-grid{
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:16px;
+  }
+  .cuts-grid-3{
+    grid-template-columns:1fr 1fr 1fr;
+    gap:10px;
   }
 
   .cuts-no-results{
@@ -345,6 +355,60 @@
     object-fit:cover;
     display:block;
   }
+
+  /* --- Карточки папок --- */
+  .folder-placeholder{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--accent);
+  }
+
+  /* --- Экран "Все папки": каждая папка со своим набором картинок --- */
+  .folder-section{
+    background:var(--panel-bg);
+    border-radius:20px;
+    padding:16px 14px;
+    margin-bottom:16px;
+  }
+  .folder-section-header{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .folder-section-title{
+    flex:1;
+    min-width:0;
+    font-size:15px;
+    font-weight:700;
+    color:#ffffff;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .folder-section-empty{
+    color:var(--text-secondary);
+    font-size:13px;
+    padding:10px 2px 4px;
+  }
+  .cut-remove-badge{
+    position:absolute;
+    left:0; right:0; top:0;
+    z-index:2;
+    border:none;
+    background:rgba(63,27,30,0.82);
+    color:var(--btn-delete-text);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.3px;
+    text-transform:uppercase;
+    padding:7px 0;
+    text-align:center;
+  }
+  .cut-remove-badge:active{ opacity:0.8; }
 
   .cuts-bottombar{
     position:fixed;
@@ -674,6 +738,27 @@
     </div>
   </div>
 
+  <!-- Экран «Все папки»: каждая папка показана целиком, со своими картинками -->
+  <div id="screen-folders" class="screen">
+    <div class="cuts-header">
+      <div class="cuts-title-row">
+        <h2>Все папки</h2>
+        <button class="pill-btn pill-btn-success" id="btn-folders-create" type="button">Создать папку</button>
+      </div>
+    </div>
+
+    <div class="cuts-scroll">
+      <div id="folders-list"></div>
+      <div class="cuts-empty hidden" id="folders-empty">
+        <div class="cuts-empty-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+        </div>
+        <div class="cuts-empty-title">Пока нет папок</div>
+        <div class="cuts-empty-text">Нажмите «Создать папку», чтобы создать первую</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Модальные окна: загрузка новой вырезки, подтверждение удаления, имя папки -->
   <div id="modal-overlay" class="modal-overlay hidden">
     <div id="modal-upload" class="modal-card hidden">
@@ -701,7 +786,7 @@
     </div>
 
     <div id="modal-folder-name" class="modal-card hidden">
-      <h3 class="modal-title">Новая папка</h3>
+      <h3 class="modal-title">Создать папку</h3>
       <input type="text" id="folder-name-input" class="name-input" placeholder="Имя папки" maxlength="40">
       <div class="modal-actions">
         <button class="modal-btn modal-btn-cancel" id="folder-name-cancel-btn" type="button">Отмена</button>
@@ -833,6 +918,28 @@
     });
   }
 
+  function dbGetAllFolders(){
+    return openDatabase().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(FOLDER_STORE, 'readonly');
+        var req = tx.objectStore(FOLDER_STORE).getAll();
+        req.onsuccess = function(){ resolve(req.result || []); };
+        req.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  function dbDeleteFolder(id){
+    return openDatabase().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(FOLDER_STORE, 'readwrite');
+        tx.objectStore(FOLDER_STORE).delete(id);
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
   // --- Состояние данных вырезок ---
   // cutsMeta хранит только лёгкие метаданные (id/имя/дата) — сами картинки
   // не держим в памяти, они лежат в IndexedDB и подгружаются по требованию.
@@ -841,10 +948,17 @@
   var currentSort = 'all';
   var pendingFile = null;
   var pendingDeleteId = null;
+  var pendingDeleteMode = null; // 'cut' | 'folder' | 'remove-from-folder'
   var filterOpenState = false;
   var imageViewerOpenState = false;
 
-  // Выбор картинок при создании папки: id -> true
+  // --- Состояние данных папок ---
+  var foldersMeta = [];
+  var pendingDeleteFolderId = null; // из какой папки убираем картинку (режим 'remove-from-folder')
+  var pickerMode = 'edit';      // экран выбора картинок всегда используется для пополнения существующей папки
+  var editingFolderId = null;
+
+  // Выбор картинок при создании/редактировании папки: id -> true
   var folderPickerSelection = {};
 
   // Кэш уже созданных object URL для показанных картинок (LRU), чтобы не
@@ -854,6 +968,7 @@
   var MAX_CACHED_IMAGES = 80;
   var cutsObserver = null;
   var pickerObserver = null;
+  var foldersObserver = null;
 
   function findCardElByDataId(id){
     return document.querySelector('.cut-image[data-id="' + id + '"], .pick-card[data-id="' + id + '"]');
@@ -936,6 +1051,14 @@
       '#picker-grid .pick-card[data-id]',
       document.querySelector('#screen-folder-picker .cuts-scroll'),
       pickerObserver
+    );
+  }
+
+  function setupFoldersObserver(){
+    foldersObserver = attachLazyObserver(
+      '#folders-list .cut-image[data-id]',
+      document.querySelector('#screen-folders .cuts-scroll'),
+      foldersObserver
     );
   }
 
@@ -1250,29 +1373,87 @@
     var item = cutsMeta.filter(function(c){ return c.id === id; })[0];
     if (!item) return;
     pendingDeleteId = id;
+    pendingDeleteMode = 'cut';
     var msg = document.getElementById('delete-message');
     if (msg) msg.innerHTML = 'Вы уверены, что хотите удалить <b>' + escapeHtml(item.name) + '</b>?';
     showModal('modal-delete');
   }
 
+  function requestDeleteFolder(id){
+    var folder = foldersMeta.filter(function(f){ return f.id === id; })[0];
+    if (!folder) return;
+    pendingDeleteId = id;
+    pendingDeleteMode = 'folder';
+    var msg = document.getElementById('delete-message');
+    if (msg) msg.innerHTML = 'Удалить папку <b>' + escapeHtml(folder.name) + '</b>? Сами картинки удалены не будут.';
+    showModal('modal-delete');
+  }
+
+  function requestRemoveFromFolder(folderId, cutId){
+    var item = cutsMeta.filter(function(c){ return c.id === cutId; })[0];
+    if (!item) return;
+    pendingDeleteId = cutId;
+    pendingDeleteFolderId = folderId;
+    pendingDeleteMode = 'remove-from-folder';
+    var msg = document.getElementById('delete-message');
+    if (msg) msg.innerHTML = 'Убрать <b>' + escapeHtml(item.name) + '</b> из папки?';
+    showModal('modal-delete');
+  }
+
   function confirmDelete(){
-    if (pendingDeleteId === null){ closeModals(); return; }
-    var idToDelete = pendingDeleteId;
+    if (pendingDeleteId === null || !pendingDeleteMode){ closeModals(); return; }
+    var mode = pendingDeleteMode;
+    var id = pendingDeleteId;
     pendingDeleteId = null;
-    dbDeleteCut(idToDelete).then(function(){
-      cutsMeta = cutsMeta.filter(function(c){ return c.id !== idToDelete; });
-      if (imageUrlCache[idToDelete]){
-        URL.revokeObjectURL(imageUrlCache[idToDelete]);
-        delete imageUrlCache[idToDelete];
-        var idx = imageLruOrder.indexOf(idToDelete);
-        if (idx !== -1) imageLruOrder.splice(idx, 1);
-      }
-      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
-      closeModals();
-      renderCutsList();
-    }).catch(function(){
-      closeModals();
-    });
+    pendingDeleteMode = null;
+
+    if (mode === 'cut'){
+      dbDeleteCut(id).then(function(){
+        cutsMeta = cutsMeta.filter(function(c){ return c.id !== id; });
+        if (imageUrlCache[id]){
+          URL.revokeObjectURL(imageUrlCache[id]);
+          delete imageUrlCache[id];
+          var idx = imageLruOrder.indexOf(id);
+          if (idx !== -1) imageLruOrder.splice(idx, 1);
+        }
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
+        closeModals();
+        renderCutsList();
+      }).catch(function(){
+        closeModals();
+      });
+      return;
+    }
+
+    if (mode === 'folder'){
+      dbDeleteFolder(id).then(function(){
+        foldersMeta = foldersMeta.filter(function(f){ return f.id !== id; });
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
+        closeModals();
+        renderFoldersList();
+      }).catch(function(){
+        closeModals();
+      });
+      return;
+    }
+
+    if (mode === 'remove-from-folder'){
+      var folderId = pendingDeleteFolderId;
+      pendingDeleteFolderId = null;
+      var folder = foldersMeta.filter(function(f){ return f.id === folderId; })[0];
+      if (!folder){ closeModals(); return; }
+      folder.cutIds = (folder.cutIds || []).filter(function(cid){ return cid !== id; });
+      dbAddFolder(folder).then(function(){
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
+        closeModals();
+        renderFoldersList();
+      }).catch(function(){
+        closeModals();
+      });
+      return;
+    }
+
+    closeModals();
   }
 
   // ============================================================
@@ -1400,7 +1581,7 @@
   }
 
   // ============================================================
-  //  Экран выбора картинок для новой папки
+  //  Экран выбора картинок для новой папки / редактирования состава папки
   // ============================================================
 
   function updatePickerSelectedCount(){
@@ -1460,13 +1641,21 @@
     setupPickerObserver();
   }
 
-  function openFolderPicker(){
+  // Открыть экран выбора картинок для пополнения состава существующей папки.
+  function openFolderEditPicker(folderId){
+    var folder = foldersMeta.filter(function(f){ return f.id === folderId; })[0];
+    if (!folder) return;
+    pickerMode = 'edit';
+    editingFolderId = folderId;
     folderPickerSelection = {};
+    (folder.cutIds || []).forEach(function(id){ folderPickerSelection[id] = true; });
     var searchInput = document.getElementById('picker-search-input');
     if (searchInput) searchInput.value = '';
     updatePickerSearchClearVisibility();
     updatePickerSelectedCount();
     renderPickerGrid();
+    var pickerNextBtn = document.getElementById('btn-picker-next');
+    if (pickerNextBtn) pickerNextBtn.textContent = 'Сохранить';
     navigateTo('screen-folder-picker');
   }
 
@@ -1487,51 +1676,100 @@
   function submitFolderCreate(){
     var input = document.getElementById('folder-name-input');
     var nameVal = input ? input.value.trim() : '';
-    var ids = Object.keys(folderPickerSelection);
-    if (!nameVal || ids.length === 0) return;
+    if (!nameVal) return;
     var folder = {
       id: 'folder_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
       name: nameVal,
-      cutIds: ids,
+      cutIds: [],
       createdAt: Date.now()
     };
     dbAddFolder(folder).then(function(){
       if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       closeModals();
+      renderFoldersList();
+    }).catch(function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+    });
+  }
+
+  // Сохранить изменённый состав картинок существующей папки (режим 'edit').
+  function saveFolderEdit(){
+    var folder = foldersMeta.filter(function(f){ return f.id === editingFolderId; })[0];
+    if (!folder){ goBack(); return; }
+    folder.cutIds = Object.keys(folderPickerSelection);
+    dbAddFolder(folder).then(function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       folderPickerSelection = {};
+      editingFolderId = null;
       goBack();
+      renderFoldersList();
     }).catch(function(){
       if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
     });
   }
 
   // ============================================================
-  //  Попап "фильтровать" (сортировка списка)
+  //  Экран "Все папки": каждая папка нарисована целиком, со своими картинками
   // ============================================================
 
-  function updateFilterCheckmarks(){
-    var opts = document.querySelectorAll('.filter-option');
-    for (var i = 0; i < opts.length; i++){
-      if (opts[i].getAttribute('data-sort') === currentSort){ opts[i].classList.add('selected'); }
-      else { opts[i].classList.remove('selected'); }
-    }
+  // Карточка картинки внутри папки: вместо строки кнопок "Скачать/Удалить"
+  // снизу — компактный оверлей "удалить" (убрать из папки) сверху, чтобы
+  // в ряд помещалось по три картинки, как в остальном списке папки.
+  function buildFolderImageCard(folderId, item){
+    return (
+      '<div class="cut-image" data-id="' + item.id + '">' +
+        '<button class="cut-remove-badge" type="button" data-action="remove-from-folder" data-folder-id="' + folderId + '" data-id="' + item.id + '">удалить</button>' +
+        '<span class="cut-tag">' + escapeHtml(item.name) + '</span>' +
+      '</div>'
+    );
   }
 
-  function openFilterPopover(anchorBtn){
-    var pop = document.getElementById('filter-popover');
-    var rect = anchorBtn.getBoundingClientRect();
-    pop.style.top = (rect.bottom + 8) + 'px';
-    pop.style.right = Math.max(18, window.innerWidth - rect.right) + 'px';
-    updateFilterCheckmarks();
-    pop.classList.remove('hidden');
-    document.getElementById('filter-backdrop').classList.remove('hidden');
-    filterOpenState = true;
+  function buildFolderSection(folder, index){
+    var ids = folder.cutIds || [];
+    // Показываем только те вырезки, которые ещё существуют
+    // (на случай, если файл удалили на экране "Все вырезки").
+    var items = ids.map(function(id){
+      return cutsMeta.filter(function(c){ return c.id === id; })[0];
+    }).filter(Boolean);
+
+    var body = items.length
+      ? '<div class="cuts-grid cuts-grid-3">' + items.map(function(item){ return buildFolderImageCard(folder.id, item); }).join('') + '</div>'
+      : '<div class="folder-section-empty">Здесь пока нет картинок — нажмите «добавить»</div>';
+
+    return (
+      '<div class="folder-section" data-folder-id="' + folder.id + '">' +
+        '<div class="folder-section-header">' +
+          '<span class="folder-section-title">#' + (index + 1) + ' ' + escapeHtml(folder.name) + '</span>' +
+          '<button class="pill-btn" type="button" data-action="add-to-folder" data-folder-id="' + folder.id + '">добавить</button>' +
+          '<button class="pill-btn pill-btn-danger" type="button" data-action="delete-folder" data-folder-id="' + folder.id + '">удалить</button>' +
+        '</div>' +
+        body +
+      '</div>'
+    );
   }
 
-  function closeFilterPopover(){
-    document.getElementById('filter-popover').classList.add('hidden');
-    document.getElementById('filter-backdrop').classList.add('hidden');
-    filterOpenState = false;
+  function renderFoldersList(){
+    dbGetAllFolders().then(function(list){
+      foldersMeta = list || [];
+      var container = document.getElementById('folders-list');
+      var emptyState = document.getElementById('folders-empty');
+      if (!container) return;
+
+      if (foldersMeta.length === 0){
+        container.innerHTML = '';
+        container.classList.add('hidden');
+        if (emptyState) emptyState.classList.remove('hidden');
+        return;
+      }
+      if (emptyState) emptyState.classList.add('hidden');
+      container.classList.remove('hidden');
+
+      var sorted = foldersMeta.slice().sort(function(a,b){ return b.createdAt - a.createdAt; });
+      var html = '';
+      for (var i = 0; i < sorted.length; i++){ html += buildFolderSection(sorted[i], i); }
+      container.innerHTML = html;
+      setupFoldersObserver();
+    }).catch(function(){});
   }
 
   // --- Первичная загрузка вырезок из локального хранилища ---
@@ -1562,12 +1800,46 @@
     });
   }
 
-  // --- Кнопка "папки" — начать создание новой папки с выбора картинок ---
+  // --- Кнопка "папки" на экране "Все вырезки" — открыть список созданных папок ---
   var btnFolders = document.getElementById('btn-folders');
   if (btnFolders){
     btnFolders.addEventListener('click', function(){
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-      openFolderPicker();
+      navigateTo('screen-folders');
+      renderFoldersList();
+    });
+  }
+
+  // --- Экран "Все папки": кнопка "Создать папку" в шапке ---
+  var btnFoldersCreate = document.getElementById('btn-folders-create');
+  if (btnFoldersCreate){
+    btnFoldersCreate.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      openFolderNameModal();
+    });
+  }
+
+  // --- Клики внутри списка папок: добавить картинки / удалить папку / убрать картинку / посмотреть крупно ---
+  var foldersList = document.getElementById('folders-list');
+  if (foldersList){
+    foldersList.addEventListener('click', function(e){
+      var actionBtn = e.target.closest ? e.target.closest('[data-action]') : null;
+      if (actionBtn){
+        var action = actionBtn.getAttribute('data-action');
+        var folderId = actionBtn.getAttribute('data-folder-id');
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        if (action === 'add-to-folder'){ openFolderEditPicker(folderId); }
+        else if (action === 'delete-folder'){ requestDeleteFolder(folderId); }
+        else if (action === 'remove-from-folder'){ requestRemoveFromFolder(folderId, actionBtn.getAttribute('data-id')); }
+        return;
+      }
+      var imageEl = e.target.closest ? e.target.closest('.cut-image') : null;
+      if (imageEl){
+        var imgId = imageEl.getAttribute('data-id');
+        if (!imgId) return;
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        openImageViewerForId(imgId);
+      }
     });
   }
 
@@ -1666,6 +1938,8 @@
   if (btnPickerClose){
     btnPickerClose.addEventListener('click', function(){
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      folderPickerSelection = {};
+      editingFolderId = null;
       goBack();
     });
   }
@@ -1678,13 +1952,13 @@
     });
   }
 
-  // --- Кнопка "Далее" — перейти к вводу имени папки ---
+  // --- Кнопка "Сохранить" — сохранить выбранные картинки в редактируемую папку ---
   var btnPickerNext = document.getElementById('btn-picker-next');
   if (btnPickerNext){
     btnPickerNext.addEventListener('click', function(){
       if (btnPickerNext.disabled) return;
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-      openFolderNameModal();
+      saveFolderEdit();
     });
   }
 
@@ -1707,10 +1981,16 @@
     });
   }
 
-  // --- Окно подтверждения удаления ---
+  // --- Окно подтверждения удаления (используется для вырезок, папок и "убрать из папки") ---
   var deleteCancelBtn = document.getElementById('delete-cancel-btn');
   var deleteConfirmBtn = document.getElementById('delete-confirm-btn');
-  if (deleteCancelBtn){ deleteCancelBtn.addEventListener('click', closeModals); }
+  if (deleteCancelBtn){
+    deleteCancelBtn.addEventListener('click', function(){
+      pendingDeleteId = null;
+      pendingDeleteMode = null;
+      closeModals();
+    });
+  }
   if (deleteConfirmBtn){ deleteConfirmBtn.addEventListener('click', confirmDelete); }
 
   // --- Окно ввода имени папки ---
@@ -1735,7 +2015,11 @@
     modalOverlay.addEventListener('click', function(e){
       if (e.target !== modalOverlay) return;
       var deleteVisible = !document.getElementById('modal-delete').classList.contains('hidden');
-      if (deleteVisible){ closeModals(); }
+      if (deleteVisible){
+        pendingDeleteId = null;
+        pendingDeleteMode = null;
+        closeModals();
+      }
     });
   }
 
@@ -1761,6 +2045,31 @@
   }
   if (filterBackdropEl){
     filterBackdropEl.addEventListener('click', closeFilterPopover);
+  }
+
+  function updateFilterCheckmarks(){
+    var opts = document.querySelectorAll('.filter-option');
+    for (var i = 0; i < opts.length; i++){
+      if (opts[i].getAttribute('data-sort') === currentSort){ opts[i].classList.add('selected'); }
+      else { opts[i].classList.remove('selected'); }
+    }
+  }
+
+  function openFilterPopover(anchorBtn){
+    var pop = document.getElementById('filter-popover');
+    var rect = anchorBtn.getBoundingClientRect();
+    pop.style.top = (rect.bottom + 8) + 'px';
+    pop.style.right = Math.max(18, window.innerWidth - rect.right) + 'px';
+    updateFilterCheckmarks();
+    pop.classList.remove('hidden');
+    document.getElementById('filter-backdrop').classList.remove('hidden');
+    filterOpenState = true;
+  }
+
+  function closeFilterPopover(){
+    document.getElementById('filter-popover').classList.add('hidden');
+    document.getElementById('filter-backdrop').classList.add('hidden');
+    filterOpenState = false;
   }
 })();
 </script>
