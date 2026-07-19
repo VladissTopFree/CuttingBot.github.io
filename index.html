@@ -639,6 +639,31 @@
   }
   .image-viewer.visible .image-viewer-stage{ opacity:1; transform:scale(1); }
   .image-viewer.visible .image-viewer-content{ transform:scale(1); }
+  .image-viewer-hint{
+    position:absolute;
+    left:50%;
+    top:calc(var(--safe-top) + 74px);
+    transform:translateX(-50%);
+    width:calc(100% - 48px);
+    max-width:320px;
+    text-align:center;
+    background:rgba(20,20,23,0.78);
+    color:var(--text-secondary);
+    font-size:13px;
+    line-height:1.4;
+    padding:10px 14px;
+    border-radius:14px;
+    -webkit-backdrop-filter:blur(12px);
+    backdrop-filter:blur(12px);
+  }
+
+  .image-viewer.savable .image-viewer-content img{
+    -webkit-touch-callout:default !important;
+    -webkit-user-select:auto !important;
+    user-select:auto !important;
+    pointer-events:auto;
+  }
+
   .image-viewer-content img{
     display:block;
     width:100%;
@@ -708,7 +733,7 @@
   }
 </style>
 </head>
-<body oncontextmenu="return false;">
+<body>
 
   <div id="screen-loading"></div>
 
@@ -882,6 +907,7 @@
         <img id="image-viewer-img" src="" alt="" draggable="false">
       </div>
     </div>
+    <div class="image-viewer-hint hidden" id="image-viewer-hint">Нажмите и удерживайте картинку, затем выберите «Сохранить»</div>
     <div class="image-viewer-zoom" id="image-viewer-zoom">
       <button type="button" data-zoom="out" aria-label="Меньше">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1255,15 +1281,19 @@
   }, { passive:false });
 
   document.addEventListener('selectstart', function(e){
-    // Разрешаем выделение текста в полях ввода (поиск, имя картинки).
     var tag = e.target && e.target.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.target && e.target.closest && e.target.closest('.image-viewer.savable')) return;
     e.preventDefault();
   });
   document.addEventListener('copy', function(e){ e.preventDefault(); });
   document.addEventListener('dragstart', function(e){ e.preventDefault(); });
 
-  // --- Скрытие клавиатуры при тапе в любое место, кроме активного поля ввода ---
+  document.addEventListener('contextmenu', function(e){
+    if (e.target && e.target.closest && e.target.closest('.image-viewer.savable')) return;
+    e.preventDefault();
+  });
+
   document.addEventListener('touchstart', function(e){
     var target = e.target;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
@@ -1426,24 +1456,61 @@
     setupCutsObserver();
   }
 
-  function downloadCut(item){
-    dbGetBlob(item.id).then(function(blob){
-      if (!blob) return;
-      var ext = 'png';
-      if (blob.type){
-        var m = /^image\/(\w+)/.exec(blob.type);
-        if (m) ext = (m[1] === 'jpeg') ? 'jpg' : m[1];
-      }
+  function cutFileName(item, blob){
+    var ext = 'png';
+    if (blob && blob.type){
+      var m = /^image\/(\w+)/.exec(blob.type);
+      if (m) ext = (m[1] === 'jpeg') ? 'jpg' : m[1];
+    }
+    var safeName = String(item.name || 'cut').replace(/[^\p{L}\p{N}_\-]+/gu, '_');
+    return (safeName || 'cut') + '.' + ext;
+  }
+
+  function saveViaLink(blob, fileName){
+    try {
       var url = URL.createObjectURL(blob);
       var link = document.createElement('a');
       link.href = url;
-      var safeName = String(item.name || 'cut').replace(/[^\p{L}\p{N}_\-]+/gu, '_');
-      link.download = safeName + '.' + ext;
+      link.download = fileName;
+      link.rel = 'noopener';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+      return true;
+    } catch(e){ return false; }
+  }
+
+  function downloadCut(item){
+    dbGetBlob(item.id).then(function(blob){
+      if (!blob) return;
+      var fileName = cutFileName(item, blob);
+      var file = null;
+      try { file = new File([blob], fileName, { type: blob.type || 'image/png' }); } catch(e){}
+
+      var canShare = file && navigator.share && navigator.canShare &&
+                     navigator.canShare({ files: [file] });
+
+      if (canShare){
+        navigator.share({ files: [file] }).then(function(){
+          if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        }).catch(function(err){
+          if (err && err.name === 'AbortError') return;
+          if (!saveViaLink(blob, fileName)) openImageViewerForId(item.id, true);
+        });
+        return;
+      }
+
+      if (isAppleWebView()){ openImageViewerForId(item.id, true); return; }
+      if (!saveViaLink(blob, fileName)) openImageViewerForId(item.id, true);
     }).catch(function(){});
+  }
+
+  function isAppleWebView(){
+    var ua = navigator.userAgent || '';
+    var isIOS = /iPad|iPhone|iPod/.test(ua) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    return isIOS || (tg && tg.platform === 'ios');
   }
 
   function requestDelete(id){
@@ -1602,11 +1669,13 @@
     ivApply(false);
   }
 
-  function openImageViewerWithUrl(url){
+  function openImageViewerWithUrl(url, saveHint){
     imageViewerImg.src = url;
+    var hintEl = document.getElementById('image-viewer-hint');
+    if (hintEl){ hintEl.classList.toggle('hidden', !saveHint); }
+    imageViewerEl.classList.toggle('savable', !!saveHint);
     imageViewerEl.classList.remove('hidden');
     ivReset();
-    // Форсируем перерасчёт стилей, чтобы переходы сыграли заново.
     void imageViewerEl.offsetWidth;
     imageViewerEl.classList.add('visible');
     imageViewerOpenState = true;
@@ -1622,10 +1691,10 @@
     }, 340);
   }
 
-  function openImageViewerForId(id){
+  function openImageViewerForId(id, saveHint){
     if (imageUrlCache[id]){
       touchLru(id);
-      openImageViewerWithUrl(imageUrlCache[id]);
+      openImageViewerWithUrl(imageUrlCache[id], saveHint);
       return;
     }
     dbGetBlob(id).then(function(blob){
@@ -1633,7 +1702,7 @@
       var url = URL.createObjectURL(blob);
       imageUrlCache[id] = url;
       touchLru(id);
-      openImageViewerWithUrl(url);
+      openImageViewerWithUrl(url, saveHint);
     }).catch(function(){});
   }
 
