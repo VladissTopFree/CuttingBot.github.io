@@ -1226,6 +1226,11 @@
     document.documentElement.style.setProperty('--tg-header-offset', isMobilePlatform() ? '56px' : '16px');
   }
 
+  function syncViewportHeight(){
+    var h = (tg && tg.viewportStableHeight) ? tg.viewportStableHeight : window.innerHeight;
+    document.documentElement.style.setProperty('--vh', h + 'px');
+  }
+
   function syncSafeArea(){
     if (tg && tg.contentSafeAreaInset){
       document.documentElement.style.setProperty('--safe-top', (tg.contentSafeAreaInset.top || 0) + 'px');
