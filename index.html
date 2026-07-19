@@ -17,6 +17,15 @@
     --btn-cut-text:#00ad3e;
     --btn-create-bg:#173643;
     --btn-create-text:#00a6cf;
+    --btn-delete-bg:#3f1b1e;
+    --btn-delete-text:#ef3c31;
+    --search-bg:#373744;
+    --search-text:#8a8aa0;
+    --placeholder-bg:#141417;
+    --panel-bg:#1d1d21;
+    --fab-bg:#435484;
+    --cta-bg:#6d91f3;
+    --tg-header-offset:56px;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --safe-left: env(safe-area-inset-left, 0px);
@@ -58,7 +67,7 @@
     flex-direction:column;
     height:var(--vh);
     width:100%;
-    padding-top:calc(var(--safe-top) + 16px);
+    padding-top:calc(var(--safe-top) + var(--tg-header-offset));
     padding-bottom:calc(var(--safe-bottom) + 20px);
     padding-left:calc(var(--safe-left) + 18px);
     padding-right:calc(var(--safe-right) + 18px);
@@ -120,6 +129,154 @@
   .btn-cut{ background:var(--btn-cut-bg); color:var(--btn-cut-text); }
   .btn-create{ background:var(--btn-create-bg); color:var(--btn-create-text); }
 
+  /* --- Экран «Все вырезки» --- */
+  #screen-cuts{ padding-bottom:0; }
+
+  .cuts-header{ flex-shrink:0; }
+
+  .cuts-title-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .cuts-title-row h2{
+    flex:1;
+    margin:0;
+    font-size:20px;
+    font-weight:700;
+    color:#ffffff;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .pill-btn{
+    flex-shrink:0;
+    border:none;
+    background:var(--card-bg);
+    color:var(--accent);
+    padding:10px 16px;
+    border-radius:999px;
+    font-size:14px;
+    font-weight:600;
+    white-space:nowrap;
+  }
+  .icon-btn{
+    flex-shrink:0;
+    width:40px; height:40px;
+    border-radius:50%;
+    border:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .icon-btn-green{ background:var(--btn-cut-bg); color:var(--btn-cut-text); }
+
+  .search-bar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--search-bg);
+    color:var(--search-text);
+    border-radius:16px;
+    padding:13px 16px;
+    margin-bottom:18px;
+    font-size:15px;
+  }
+  .search-bar svg{ flex-shrink:0; }
+
+  .cuts-scroll{
+    flex:1;
+    min-height:0;
+    overflow-y:auto;
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+    touch-action:pan-y;
+    padding-bottom:calc(var(--safe-bottom) + 104px);
+  }
+
+  .cuts-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+
+  .cut-card{ display:flex; flex-direction:column; }
+  .cut-image{
+    position:relative;
+    aspect-ratio:0.93;
+    border-radius:18px;
+    background:var(--placeholder-bg);
+    overflow:hidden;
+  }
+  .cut-tag{
+    position:absolute;
+    left:8px; bottom:8px;
+    max-width:calc(100% - 16px);
+    background:rgba(0,0,0,0.6);
+    color:#ffffff;
+    font-size:12px;
+    font-weight:500;
+    padding:4px 10px;
+    border-radius:8px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .cut-actions{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-top:10px;
+  }
+  .cut-btn{
+    border:none;
+    padding:11px 0;
+    border-radius:12px;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:0.3px;
+    text-transform:uppercase;
+  }
+  .cut-btn-download{ background:var(--btn-cut-bg); color:var(--btn-cut-text); }
+  .cut-btn-redo{ background:var(--btn-create-bg); color:var(--btn-create-text); }
+  .cut-btn-delete{ background:var(--btn-delete-bg); color:var(--btn-delete-text); }
+
+  .cuts-bottombar{
+    position:fixed;
+    left:0; right:0; bottom:0;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background:var(--panel-bg);
+    padding:12px calc(var(--safe-right) + 18px) calc(var(--safe-bottom) + 12px) calc(var(--safe-left) + 18px);
+  }
+  .fab{
+    flex-shrink:0;
+    width:52px; height:52px;
+    border-radius:50%;
+    border:none;
+    background:var(--fab-bg);
+    color:#ffffff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .cta-btn{
+    flex:1;
+    border:none;
+    background:var(--cta-bg);
+    color:#ffffff;
+    padding:16px 0;
+    border-radius:20px;
+    font-size:16px;
+    font-weight:800;
+    letter-spacing:0.4px;
+    text-transform:uppercase;
+  }
+  .btn:active, .cut-btn:active, .pill-btn:active, .icon-btn:active, .fab:active, .cta-btn:active{ opacity:0.85; }
+
   #screen-loading{
     display:flex;
     align-items:center;
@@ -149,6 +306,33 @@
     </div>
   </div>
 
+  <div id="screen-cuts" class="screen">
+    <div class="cuts-header">
+      <div class="cuts-title-row">
+        <h2 id="cuts-title">Все вырезки&nbsp;• 125</h2>
+        <button class="pill-btn" id="btn-filter" type="button">фильтровать</button>
+        <button class="icon-btn icon-btn-green" id="btn-folders" type="button" aria-label="Папки">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+        </button>
+      </div>
+      <div class="search-bar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>Поиск</span>
+      </div>
+    </div>
+
+    <div class="cuts-scroll">
+      <div class="cuts-grid" id="cuts-grid"></div>
+    </div>
+
+    <div class="cuts-bottombar">
+      <button class="fab" id="btn-add" type="button" aria-label="Добавить">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <button class="cta-btn" id="btn-cuts-cta" type="button">Вырезать</button>
+    </div>
+  </div>
+
 <script>
 (function(){
   // ID пользователя, которому разрешён доступ к боту.
@@ -156,11 +340,41 @@
 
   var tg = window.Telegram ? window.Telegram.WebApp : null;
 
-  function show(id){
+  // Стек экранов — нужен, чтобы нативная кнопка "Назад" в Telegram
+  // всегда возвращала на предыдущий экран, а не закрывала mini app.
+  var screenStack = [];
+
+  function render(){
     document.getElementById('screen-loading').style.display = 'none';
     var screens = document.querySelectorAll('.screen');
     for (var i = 0; i < screens.length; i++){ screens[i].classList.remove('active'); }
-    document.getElementById(id).classList.add('active');
+    var current = screenStack[screenStack.length - 1];
+    document.getElementById(current).classList.add('active');
+
+    if (tg && tg.BackButton){
+      if (screenStack.length > 1){ tg.BackButton.show(); }
+      else { tg.BackButton.hide(); }
+    }
+  }
+
+  // Открыть новый экран поверх текущего (с возвратом по кнопке "Назад").
+  function navigateTo(id){
+    screenStack.push(id);
+    render();
+  }
+
+  // Вернуться на один экран назад.
+  function goBack(){
+    if (screenStack.length > 1){
+      screenStack.pop();
+      render();
+    }
+  }
+
+  // Показать экран как корневой (без истории, кнопка "Назад" скрыта).
+  function show(id){
+    screenStack = [id];
+    render();
   }
 
   function syncViewportHeight(){
@@ -187,6 +401,7 @@
     try { tg.setBackgroundColor('#1b1b1e'); } catch(e){}
     try { tg.setHeaderColor('#1b1b1e'); } catch(e){}
     try { tg.setBottomBarColor && tg.setBottomBarColor('#1b1b1e'); } catch(e){}
+    try { tg.BackButton && tg.BackButton.onClick(goBack); } catch(e){}
 
     if (tg.onEvent){
       tg.onEvent('viewportChanged', syncViewportHeight);
