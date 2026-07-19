@@ -205,6 +205,20 @@
   }
   .search-input::placeholder{ color:var(--search-text); }
 
+  .search-clear{
+    flex-shrink:0;
+    width:22px; height:22px;
+    padding:0;
+    border:none;
+    border-radius:50%;
+    background:rgba(255,255,255,0.10);
+    color:var(--search-text);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .search-clear:active{ opacity:0.7; }
+
   .cuts-scroll{
     flex:1;
     min-height:0;
@@ -527,6 +541,9 @@
       <div class="search-bar">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="search-input" id="search-input" type="text" placeholder="Поиск" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="search-clear hidden" id="search-clear" type="button" aria-label="Очистить">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+        </button>
       </div>
     </div>
 
@@ -604,13 +621,174 @@
   // всегда возвращала на предыдущий экран, а не закрывала mini app.
   var screenStack = [];
 
-  // --- Состояние данных вырезок (загруженные пользователем картинки) ---
-  var cuts = [];              // { id, name, image (dataURL), createdAt }
+  // ============================================================
+  //  Локальное хранилище картинок (IndexedDB)
+  //  Метаданные (id, имя, дата) и сами файлы-картинки (blob) хранятся
+  //  в разных сторах, чтобы список из тысяч вырезок листался мгновенно,
+  //  а сами картинки подгружались лениво, только когда попадают в экран.
+  // ============================================================
+  var DB_NAME = 'cutsStorage';
+  var DB_VERSION = 1;
+  var META_STORE = 'meta';
+  var BLOB_STORE = 'blobs';
+  var dbPromise = null;
+
+  function openDatabase(){
+    if (!window.indexedDB) return Promise.reject(new Error('IndexedDB unavailable'));
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(function(resolve, reject){
+      var req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function(e){
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains(META_STORE)){ db.createObjectStore(META_STORE, { keyPath: 'id' }); }
+        if (!db.objectStoreNames.contains(BLOB_STORE)){ db.createObjectStore(BLOB_STORE, { keyPath: 'id' }); }
+      };
+      req.onsuccess = function(e){ resolve(e.target.result); };
+      req.onerror = function(e){ reject(e.target.error); };
+    });
+    return dbPromise;
+  }
+
+  function dbAddCut(meta, blob){
+    return openDatabase().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction([META_STORE, BLOB_STORE], 'readwrite');
+        tx.objectStore(META_STORE).put(meta);
+        tx.objectStore(BLOB_STORE).put({ id: meta.id, blob: blob });
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  function dbGetAllMeta(){
+    return openDatabase().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(META_STORE, 'readonly');
+        var req = tx.objectStore(META_STORE).getAll();
+        req.onsuccess = function(){ resolve(req.result || []); };
+        req.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  function dbGetBlob(id){
+    return openDatabase().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(BLOB_STORE, 'readonly');
+        var req = tx.objectStore(BLOB_STORE).get(id);
+        req.onsuccess = function(){ resolve(req.result ? req.result.blob : null); };
+        req.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  function dbDeleteCut(id){
+    return openDatabase().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction([META_STORE, BLOB_STORE], 'readwrite');
+        tx.objectStore(META_STORE).delete(id);
+        tx.objectStore(BLOB_STORE).delete(id);
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  // --- Состояние данных вырезок ---
+  // cutsMeta хранит только лёгкие метаданные (id/имя/дата) — сами картинки
+  // не держим в памяти, они лежат в IndexedDB и подгружаются по требованию.
+  var cutsMeta = [];
   var cutIdCounter = 1;
-  var currentSort = 'all';    // 'all' | 'newest' | 'oldest'
-  var pendingImageData = null;
+  var currentSort = 'all';
+  var pendingFile = null;
   var pendingDeleteId = null;
   var filterOpenState = false;
+
+  // Кэш уже созданных object URL для показанных картинок (LRU), чтобы не
+  // читать одну и ту же картинку из IndexedDB повторно при повторном рендере.
+  var imageUrlCache = {};
+  var imageLruOrder = [];
+  var MAX_CACHED_IMAGES = 80;
+  var cutsObserver = null;
+
+  function touchLru(id){
+    var idx = imageLruOrder.indexOf(id);
+    if (idx !== -1) imageLruOrder.splice(idx, 1);
+    imageLruOrder.push(id);
+    while (imageLruOrder.length > MAX_CACHED_IMAGES){
+      var oldestId = imageLruOrder.shift();
+      var url = imageUrlCache[oldestId];
+      if (url){
+        URL.revokeObjectURL(url);
+        delete imageUrlCache[oldestId];
+      }
+      var oldEl = document.querySelector('.cut-image[data-id="' + oldestId + '"]');
+      if (oldEl){
+        oldEl.removeAttribute('data-loaded');
+        var imgTag = oldEl.querySelector('img');
+        if (imgTag) imgTag.remove();
+      }
+    }
+  }
+
+  function setCardImage(el, url){
+    if (el.getAttribute('data-loaded') === '1') return;
+    var img = document.createElement('img');
+    img.src = url;
+    img.alt = '';
+    img.draggable = false;
+    el.insertBefore(img, el.firstChild);
+    el.setAttribute('data-loaded', '1');
+  }
+
+  function loadCutImage(el){
+    var id = el.getAttribute('data-id');
+    if (!id || el.getAttribute('data-loaded') === '1') return;
+    if (imageUrlCache[id]){
+      setCardImage(el, imageUrlCache[id]);
+      touchLru(id);
+      return;
+    }
+    dbGetBlob(id).then(function(blob){
+      if (!blob) return;
+      var url = URL.createObjectURL(blob);
+      imageUrlCache[id] = url;
+      touchLru(id);
+      var target = document.querySelector('.cut-image[data-id="' + id + '"]');
+      if (target) setCardImage(target, url);
+    }).catch(function(){});
+  }
+
+  function setupCutsObserver(){
+    var nodes = document.querySelectorAll('.cut-image[data-id]');
+    if (!('IntersectionObserver' in window)){
+      // Фолбэк без IntersectionObserver — грузим всё сразу.
+      for (var i = 0; i < nodes.length; i++){ loadCutImage(nodes[i]); }
+      return;
+    }
+    if (cutsObserver) cutsObserver.disconnect();
+    cutsObserver = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if (entry.isIntersecting){ loadCutImage(entry.target); }
+      });
+    }, { root: document.querySelector('.cuts-scroll'), rootMargin: '600px 0px', threshold: 0.01 });
+    for (var j = 0; j < nodes.length; j++){ cutsObserver.observe(nodes[j]); }
+  }
+
+  function loadCutsFromDB(){
+    if (!window.indexedDB){ renderCutsList(); return; }
+    dbGetAllMeta().then(function(list){
+      cutsMeta = list || [];
+      var maxNum = 0;
+      for (var i = 0; i < cutsMeta.length; i++){
+        var m = /^cut_(\d+)$/.exec(cutsMeta[i].id);
+        if (m){ var n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
+      }
+      cutIdCounter = maxNum + 1;
+      renderCutsList();
+    }).catch(function(){ renderCutsList(); });
+  }
 
   function render(){
     document.getElementById('screen-loading').style.display = 'none';
@@ -720,6 +898,16 @@
   document.addEventListener('copy', function(e){ e.preventDefault(); });
   document.addEventListener('dragstart', function(e){ e.preventDefault(); });
 
+  // --- Скрытие клавиатуры при тапе в любое место, кроме активного поля ввода ---
+  document.addEventListener('touchstart', function(e){
+    var target = e.target;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+    var active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')){
+      active.blur();
+    }
+  }, { passive:true, capture:true });
+
   // --- Экранирование текста перед вставкой в innerHTML ---
   function escapeHtml(str){
     return String(str == null ? '' : str).replace(/[&<>"']/g, function(ch){
@@ -814,19 +1002,20 @@
   // ============================================================
 
   function getSortedCuts(){
-    var arr = cuts.slice();
+    var arr = cutsMeta.slice();
     if (currentSort === 'newest'){ arr.sort(function(a,b){ return b.createdAt - a.createdAt; }); }
     else if (currentSort === 'oldest'){ arr.sort(function(a,b){ return a.createdAt - b.createdAt; }); }
     return arr;
   }
 
+  // Картинка внутри карточки не встраивается сразу: она подгружается лениво
+  // (см. loadCutImage/setupCutsObserver), когда карточка появляется на экране.
   // Заглушка под кнопку "Переделать" убрана из разметки карточки:
   // она понадобится позже, поэтому её стили (.cut-btn-redo) в CSS остались нетронутыми.
   function buildCutCard(item){
     return (
       '<div class="cut-card">' +
-        '<div class="cut-image">' +
-          '<img src="' + item.image + '" alt="" draggable="false">' +
+        '<div class="cut-image" data-id="' + item.id + '">' +
           '<span class="cut-tag">' + escapeHtml(item.name) + '</span>' +
         '</div>' +
         '<div class="cut-actions">' +
@@ -843,9 +1032,9 @@
     if (!grid) return;
 
     var titleEl = document.getElementById('cuts-title');
-    if (titleEl) titleEl.innerHTML = 'Все вырезки&nbsp;• ' + cuts.length;
+    if (titleEl) titleEl.innerHTML = 'Все вырезки&nbsp;• ' + cutsMeta.length;
 
-    if (cuts.length === 0){
+    if (cutsMeta.length === 0){
       grid.innerHTML = '';
       grid.classList.add('hidden');
       if (emptyState) emptyState.classList.remove('hidden');
@@ -869,23 +1058,31 @@
     var html = '';
     for (var i = 0; i < filtered.length; i++){ html += buildCutCard(filtered[i]); }
     grid.innerHTML = html;
+    setupCutsObserver();
   }
 
   function downloadCut(item){
-    var link = document.createElement('a');
-    link.href = item.image;
-    var ext = 'png';
-    var m = /^data:image\/(\w+);/.exec(item.image || '');
-    if (m) ext = (m[1] === 'jpeg') ? 'jpg' : m[1];
-    var safeName = String(item.name || 'cut').replace(/[^\p{L}\p{N}_\-]+/gu, '_');
-    link.download = safeName + '.' + ext;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    dbGetBlob(item.id).then(function(blob){
+      if (!blob) return;
+      var ext = 'png';
+      if (blob.type){
+        var m = /^image\/(\w+)/.exec(blob.type);
+        if (m) ext = (m[1] === 'jpeg') ? 'jpg' : m[1];
+      }
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement('a');
+      link.href = url;
+      var safeName = String(item.name || 'cut').replace(/[^\p{L}\p{N}_\-]+/gu, '_');
+      link.download = safeName + '.' + ext;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    }).catch(function(){});
   }
 
   function requestDelete(id){
-    var item = cuts.filter(function(c){ return c.id === id; })[0];
+    var item = cutsMeta.filter(function(c){ return c.id === id; })[0];
     if (!item) return;
     pendingDeleteId = id;
     var msg = document.getElementById('delete-message');
@@ -895,11 +1092,22 @@
 
   function confirmDelete(){
     if (pendingDeleteId === null){ closeModals(); return; }
-    cuts = cuts.filter(function(c){ return c.id !== pendingDeleteId; });
+    var idToDelete = pendingDeleteId;
     pendingDeleteId = null;
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
-    closeModals();
-    renderCutsList();
+    dbDeleteCut(idToDelete).then(function(){
+      cutsMeta = cutsMeta.filter(function(c){ return c.id !== idToDelete; });
+      if (imageUrlCache[idToDelete]){
+        URL.revokeObjectURL(imageUrlCache[idToDelete]);
+        delete imageUrlCache[idToDelete];
+        var idx = imageLruOrder.indexOf(idToDelete);
+        if (idx !== -1) imageLruOrder.splice(idx, 1);
+      }
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
+      closeModals();
+      renderCutsList();
+    }).catch(function(){
+      closeModals();
+    });
   }
 
   // ============================================================
@@ -931,7 +1139,7 @@
   }
 
   function openUploadModal(){
-    pendingImageData = null;
+    pendingFile = null;
     resetUploadDropzone();
     var nameInput = document.getElementById('upload-name-input');
     if (nameInput) nameInput.value = '';
@@ -943,17 +1151,17 @@
     var nameInput = document.getElementById('upload-name-input');
     var btn = document.getElementById('upload-submit-btn');
     var nameVal = nameInput ? nameInput.value.trim() : '';
-    btn.disabled = !(pendingImageData && nameVal.length > 0);
+    btn.disabled = !(pendingFile && nameVal.length > 0);
   }
 
   function handleFileSelect(e){
     var file = e.target.files && e.target.files[0];
     if (!file) return;
+    pendingFile = file;
     var reader = new FileReader();
     reader.onload = function(ev){
-      pendingImageData = ev.target.result;
       var dz = document.getElementById('upload-dropzone');
-      dz.innerHTML = '<img src="' + pendingImageData + '" alt="">';
+      dz.innerHTML = '<img src="' + ev.target.result + '" alt="">';
       dz.classList.add('has-image');
       updateUploadSubmitState();
     };
@@ -963,18 +1171,21 @@
   function submitUpload(){
     var nameInput = document.getElementById('upload-name-input');
     var nameVal = nameInput ? nameInput.value.trim() : '';
-    if (!pendingImageData || !nameVal) return;
-    cuts.push({
-      id: 'cut_' + (cutIdCounter++),
-      name: nameVal,
-      image: pendingImageData,
-      createdAt: Date.now()
+    if (!pendingFile || !nameVal) return;
+    var id = 'cut_' + (cutIdCounter++);
+    var meta = { id: id, name: nameVal, createdAt: Date.now() };
+    var fileToStore = pendingFile;
+    dbAddCut(meta, fileToStore).then(function(){
+      cutsMeta.push(meta);
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      closeModals();
+      var searchInput = document.getElementById('search-input');
+      if (searchInput){ searchInput.value = ''; updateSearchClearVisibility(); }
+      pendingFile = null;
+      renderCutsList();
+    }).catch(function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
     });
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-    closeModals();
-    var searchInput = document.getElementById('search-input');
-    if (searchInput) searchInput.value = '';
-    renderCutsList();
   }
 
   // ============================================================
@@ -1007,8 +1218,8 @@
     filterOpenState = false;
   }
 
-  // --- Первичный рендер списка (пусто, пока ничего не загружено) ---
-  renderCutsList();
+  // --- Первичная загрузка вырезок из локального хранилища ---
+  loadCutsFromDB();
 
   // --- Навигация с главного экрана ---
   var btnCut = document.getElementById('btn-cut');
@@ -1035,10 +1246,30 @@
     });
   }
 
-  // --- Поиск по имени картинки ---
+  // --- Поиск по имени картинки + крестик очистки ---
   var searchInputEl = document.getElementById('search-input');
+  var searchClearBtn = document.getElementById('search-clear');
+
+  function updateSearchClearVisibility(){
+    if (!searchClearBtn || !searchInputEl) return;
+    if (searchInputEl.value.length > 0){ searchClearBtn.classList.remove('hidden'); }
+    else { searchClearBtn.classList.add('hidden'); }
+  }
+
   if (searchInputEl){
-    searchInputEl.addEventListener('input', function(){ renderCutsList(); });
+    searchInputEl.addEventListener('input', function(){
+      updateSearchClearVisibility();
+      renderCutsList();
+    });
+  }
+  if (searchClearBtn){
+    searchClearBtn.addEventListener('click', function(){
+      if (!searchInputEl) return;
+      searchInputEl.value = '';
+      updateSearchClearVisibility();
+      renderCutsList();
+      searchInputEl.blur();
+    });
   }
 
   // --- Клики по карточкам (скачать / удалить) ---
@@ -1048,7 +1279,7 @@
       var actionBtn = e.target.closest ? e.target.closest('[data-action]') : null;
       if (!actionBtn) return;
       var id = actionBtn.getAttribute('data-id');
-      var item = cuts.filter(function(c){ return c.id === id; })[0];
+      var item = cutsMeta.filter(function(c){ return c.id === id; })[0];
       if (!item) return;
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
       var action = actionBtn.getAttribute('data-action');
