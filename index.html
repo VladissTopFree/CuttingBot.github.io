@@ -1212,21 +1212,18 @@
     }
   }
 
-  // Показать экран как корневой (без истории, кнопка "Назад" скрыта).
   function show(id){
     screenStack = [id];
     render();
   }
 
-  function syncHeaderOffset(){
+  function isMobilePlatform(){
     var platform = tg && tg.platform;
-    var isMobile = platform === 'ios' || platform === 'android';
-    document.documentElement.style.setProperty('--tg-header-offset', isMobile ? '56px' : '16px');
+    return platform === 'ios' || platform === 'android';
   }
 
-  function syncViewportHeight(){
-    var h = (tg && tg.viewportStableHeight) ? tg.viewportStableHeight : window.innerHeight;
-    document.documentElement.style.setProperty('--vh', h + 'px');
+  function syncHeaderOffset(){
+    document.documentElement.style.setProperty('--tg-header-offset', isMobilePlatform() ? '56px' : '16px');
   }
 
   function syncSafeArea(){
@@ -1241,10 +1238,13 @@
   if (tg){
     tg.ready();
 
-    // Полноэкранный режим, без учёта темы Telegram — цвета зашиты в CSS.
     try { tg.expand(); } catch(e){}
-    try { tg.requestFullscreen(); } catch(e){}
-    try { tg.disableVerticalSwipes(); } catch(e){}
+    if (isMobilePlatform()){
+      try { tg.requestFullscreen(); } catch(e){}
+      try { tg.disableVerticalSwipes(); } catch(e){}
+    } else {
+      try { tg.exitFullscreen && tg.exitFullscreen(); } catch(e){}
+    }
     try { tg.setBackgroundColor('#1b1b1e'); } catch(e){}
     try { tg.setHeaderColor('#1b1b1e'); } catch(e){}
     try { tg.setBottomBarColor && tg.setBottomBarColor('#1b1b1e'); } catch(e){}
