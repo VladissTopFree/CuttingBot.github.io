@@ -687,6 +687,17 @@
     font-weight:600;
   }
 
+  .image-viewer-divider{
+    width:1px;
+    height:24px;
+    background:rgba(255,255,255,0.14);
+    margin:0 2px;
+  }
+  .image-viewer-close{
+    background:var(--btn-delete-bg) !important;
+    color:var(--btn-delete-text) !important;
+  }
+
   #screen-loading{
     display:flex;
     align-items:center;
@@ -878,6 +889,10 @@
       <span class="image-viewer-scale" id="image-viewer-scale">100%</span>
       <button type="button" data-zoom="in" aria-label="Больше">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <span class="image-viewer-divider"></span>
+      <button type="button" data-viewer-close="1" class="image-viewer-close" aria-label="Закрыть">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
       </button>
     </div>
   </div>
@@ -1722,6 +1737,13 @@
 
   if (imageViewerZoomBar){
     imageViewerZoomBar.addEventListener('click', function(e){
+      var closeBtn = e.target.closest ? e.target.closest('[data-viewer-close]') : null;
+      if (closeBtn){
+        e.stopPropagation();
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        closeImageViewer();
+        return;
+      }
       var btn = e.target.closest ? e.target.closest('[data-zoom]') : null;
       if (!btn || btn.disabled) return;
       e.stopPropagation();
@@ -1730,10 +1752,6 @@
       ivZoomTo(dir === 'in' ? ivScale * 1.4 : ivScale / 1.4, undefined, undefined, true);
     });
   }
-
-  // ============================================================
-  //  Модальные окна (загрузка новой картинки / подтверждение удаления / имя папки)
-  // ============================================================
 
   function showModal(id){
     var overlay = document.getElementById('modal-overlay');
