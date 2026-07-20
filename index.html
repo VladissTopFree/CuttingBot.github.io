@@ -155,7 +155,6 @@
   .btn-cut{ background:var(--btn-cut-bg); color:var(--btn-cut-text); }
   .btn-create{ background:var(--btn-create-bg); color:var(--btn-create-text); }
 
-  /* --- Экран «Все вырезки» --- */
   #screen-cuts{ padding-bottom:0; }
   #screen-folder-picker{ padding-bottom:0; }
   #screen-folders{ padding-bottom:0; }
@@ -353,12 +352,9 @@
     text-transform:uppercase;
   }
   .cut-btn-download{ background:var(--btn-cut-bg); color:var(--btn-cut-text); }
-  /* Кнопка "Переделать" оставлена в стилях — она понадобится позже,
-     просто сейчас карточки (созданные через "+") её не используют. */
   .cut-btn-redo{ background:var(--btn-create-bg); color:var(--btn-create-text); }
   .cut-btn-delete{ background:var(--btn-delete-bg); color:var(--btn-delete-text); }
 
-  /* --- Карточки выбора картинок для папки --- */
   .pick-card{
     position:relative;
     aspect-ratio:0.93;
@@ -376,7 +372,6 @@
     display:block;
   }
 
-  /* --- Карточки папок --- */
   .folder-placeholder{
     position:absolute;
     inset:0;
@@ -386,7 +381,6 @@
     color:var(--accent);
   }
 
-  /* --- Экран "Все папки": каждая папка со своим набором картинок --- */
   .folder-section{
     background:var(--panel-bg);
     border-radius:20px;
@@ -465,7 +459,6 @@
   .cta-btn:disabled{ opacity:0.4; }
   .btn:active, .cut-btn:active, .pill-btn:active, .icon-btn:active, .fab:active, .cta-btn:active:not(:disabled){ opacity:0.85; }
 
-  /* --- Модальные окна --- */
   .modal-overlay{
     position:fixed;
     inset:0;
@@ -573,7 +566,6 @@
   .modal-btn-danger{ background:var(--btn-delete-bg); color:var(--btn-delete-text); }
   .modal-btn:active:not(:disabled){ opacity:0.85; }
 
-  /* --- Попап фильтрации/сортировки --- */
   .filter-backdrop{
     position:fixed;
     inset:0;
@@ -584,6 +576,9 @@
     position:fixed;
     z-index:900;
     width:222px;
+    max-width:calc(100vw - 24px);
+    max-height:calc(100vh - 24px);
+    overflow-y:auto;
     background:var(--popover-bg);
     border-radius:18px;
     padding:12px 6px;
@@ -614,7 +609,6 @@
   .filter-option:not(.selected) .check svg{ visibility:hidden; }
   .filter-option:active{ background:rgba(255,255,255,0.06); }
 
-  /* --- Просмотр картинки в большом размере (лайтбокс) --- */
   .image-viewer{
     position:fixed;
     inset:0;
@@ -837,6 +831,8 @@
     background:var(--placeholder-bg); margin-bottom:14px; line-height:0;
   }
   #work-canvas{ width:100%; height:auto; display:block; touch-action:none; }
+  .work-canvas-box.free #work-canvas{ touch-action:pan-y; }
+  .work-scroll > .work-canvas-box{ margin-bottom:14px; }
 
   .work-scroll{
     flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
@@ -930,7 +926,16 @@
   .work-swatch-white{ background:#ffffff; }
   .work-swatch-black{ background:#000000; }
   .work-swatch-custom{
-    background:conic-gradient(#ff5f6d,#ffc371,#47e6b1,#3fa7ff,#a86bff,#ff5f6d);
+    background:
+      radial-gradient(circle at 50% 50%,
+        rgba(255,255,255,0.98) 0%,
+        rgba(255,255,255,0.70) 30%,
+        rgba(255,255,255,0.18) 52%,
+        rgba(255,255,255,0) 70%),
+      conic-gradient(from 210deg,
+        #ff4d6d,#ff9f43,#ffd93d,#4ade80,#38bdf8,#818cf8,#a78bfa,#ff4d6d);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,0.22),
+               inset 0 0 10px rgba(255,255,255,0.35);
     overflow:hidden;
   }
   .work-swatch-custom input{
@@ -938,8 +943,11 @@
     opacity:0; border:none; padding:0;
   }
   .work-swatch-custom span{
-    position:absolute; inset:7px; border-radius:50%;
-    border:2px solid rgba(255,255,255,0.85);
+    position:absolute; inset:8px; border-radius:50%;
+    border:none;
+    background:radial-gradient(circle at 50% 45%,
+      rgba(255,255,255,0.96), rgba(255,255,255,0.72));
+    box-shadow:0 0 10px 3px rgba(255,255,255,0.35);
   }
 </style>
 </head>
@@ -999,7 +1007,6 @@
     </div>
   </div>
 
-  <!-- Экран выбора картинок для новой папки -->
   <div id="screen-folder-picker" class="screen">
     <div class="cuts-header">
       <div class="cuts-title-row">
@@ -1035,7 +1042,6 @@
     </div>
   </div>
 
-  <!-- Экран «Все папки»: каждая папка показана целиком, со своими картинками -->
   <div id="screen-folders" class="screen">
     <div class="cuts-header">
       <div class="cuts-title-row">
@@ -1057,7 +1063,6 @@
     </div>
   </div>
 
-  <!-- Экран 1: выделение области -->
   <div id="screen-cutout-select" class="screen">
     <h2 class="cutout-title">Вырезание&nbsp;- <span>1 шаг</span></h2>
     <div class="cutout-body">
@@ -1073,7 +1078,6 @@
     </div>
   </div>
 
-  <!-- Экран 2: результат -->
   <div id="screen-cutout-result" class="screen">
     <h2 class="cutout-title">Вырезание&nbsp;- <span>2 шаг</span></h2>
     <div class="cutout-body">
@@ -1096,7 +1100,6 @@
     </div>
   </div>
 
-  <!-- Создание работы: шаг 1 — выбор картинок -->
   <div id="screen-work-picker" class="screen">
     <div class="cuts-header">
       <div class="cuts-title-row">
@@ -1134,7 +1137,6 @@
     </div>
   </div>
 
-  <!-- Создание работы: шаг 2 — формирование -->
   <div id="screen-work-build" class="screen">
     <div class="work-head">
       <h2 class="cutout-title" style="margin:4px 0 12px">Создание работы&nbsp;- <span>формирование</span></h2>
@@ -1144,20 +1146,25 @@
     </div>
 
     <div class="work-scroll" id="work-scroll">
-      <!-- фон -->
       <div class="work-panel">
+        <div class="work-row">
+          <span class="work-label">передвижение на холсте<small>пальцем</small></span>
+          <button class="pill-btn pill-btn-success" id="btn-work-drag" type="button">включено</button>
+        </div>
+        <div class="work-row">
+          <span class="work-label">холст при прокрутке</span>
+          <button class="pill-btn pill-btn-success" id="btn-work-pin" type="button">закреплён</button>
+        </div>
         <div class="work-row" id="work-bg-row">
           <span class="work-label">цвет фона</span>
         </div>
       </div>
 
-      <!-- тексты -->
       <div id="work-text-list"></div>
       <div class="work-panel work-panel-flat">
         <button class="pill-btn pill-btn-success work-wide-btn" id="btn-work-add-text" type="button">добавить ещё один текст</button>
       </div>
 
-      <!-- картинки -->
       <div class="work-section-head">
         <span class="work-section-title">Редактирование слоёв</span>
         <button class="pill-btn pill-btn-success" id="btn-work-add-image" type="button">+ картинка</button>
@@ -1170,7 +1177,6 @@
     </div>
   </div>
 
-  <!-- Окно ожидания вырезания -->
   <div id="cutout-progress" class="cutout-progress hidden">
     <div class="cutout-progress-card">
       <div class="cutout-spinner"></div>
@@ -1182,7 +1188,6 @@
 
   <input type="file" id="cutout-file-input" accept="image/*" class="hidden">
 
-  <!-- Модальные окна: загрузка новой вырезки, подтверждение удаления, имя папки -->
   <div id="modal-overlay" class="modal-overlay hidden">
     <div id="modal-upload" class="modal-card hidden">
       <h3 class="modal-title">Новая вырезка</h3>
@@ -1290,7 +1295,6 @@
     </div>
   </div>
 
-<!-- ======================= WORKER ======================= -->
 <script id="workerSrc" type="javascript/worker">
 'use strict';
 
@@ -2175,7 +2179,7 @@ onmessage=e=>{
 
 <script>
 (function(){
-  var APP_VERSION = '0.0.1(6)';
+  var APP_VERSION = '0.0.1(7)';
 
   var ALLOWED_USER_ID = 1781692500;
 
@@ -2298,32 +2302,25 @@ onmessage=e=>{
     });
   }
 
-  // --- Состояние данных вырезок ---
-  // cutsMeta хранит только лёгкие метаданные (id/имя/дата) — сами картинки
-  // не держим в памяти, они лежат в IndexedDB и подгружаются по требованию.
   var cutsMeta = [];
   var cutIdCounter = 1;
   var currentSort = 'all';
   var pendingFile = null;
   var pendingDeleteId = null;
-  var pendingDeleteMode = null; // 'cut' | 'folder' | 'remove-from-folder'
+  var pendingDeleteMode = null; 
   var filterOpenState = false;
   var imageViewerOpenState = false;
 
-  // --- Состояние данных папок ---
   var foldersMeta = [];
-  var pendingDeleteFolderId = null; // из какой папки убираем картинку (режим 'remove-from-folder')
-  var pickerMode = 'edit';      // экран выбора картинок всегда используется для пополнения существующей папки
+  var pendingDeleteFolderId = null; 
+  var pickerMode = 'edit';      
   var editingFolderId = null;
 
-  // Выбор картинок при создании/редактировании папки: id -> true
   var folderPickerSelection = {};
 
-  // Кэш уже созданных object URL для показанных картинок (LRU), чтобы не
-  // читать одну и ту же картинку из IndexedDB повторно при повторном рендере.
   var imageUrlCache = {};
   var imageLruOrder = [];
-  var MAX_CACHED_IMAGES = 80;
+  var MAX_CACHED_IMAGES = 100;
   var cutsObserver = null;
   var pickerObserver = null;
   var foldersObserver = null;
@@ -2526,11 +2523,9 @@ onmessage=e=>{
     var userId = tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id;
     show(userId === ALLOWED_USER_ID ? 'screen-menu' : 'screen-denied');
   } else {
-    // Открыто вне Telegram — по умолчанию показываем экран отказа.
     show('screen-denied');
   }
 
-  // --- Блокировка жестов: пинч-зум, двойной тап, выделение, копирование, protyagivanie экрана ---
   document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, { passive:false });
   document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, { passive:false });
   document.addEventListener('touchmove', function(e){
@@ -2567,18 +2562,12 @@ onmessage=e=>{
     }
   }, { passive:true, capture:true });
 
-  // --- Экранирование текста перед вставкой в innerHTML ---
   function escapeHtml(str){
     return String(str == null ? '' : str).replace(/[&<>"']/g, function(ch){
       return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch];
     });
   }
 
-  // ============================================================
-  //  Поиск: устойчивый к опечаткам и к переключённой раскладке
-  // ============================================================
-
-  // Соответствие клавиш ЙЦУКЕН <-> QWERTY по их физическому положению.
   var EN_RU_MAP = {
     'q':'й','w':'ц','e':'у','r':'к','t':'е','y':'н','u':'г','i':'ш','o':'щ','p':'з',
     '[':'х',']':'ъ',
@@ -2599,7 +2588,6 @@ onmessage=e=>{
     return out;
   }
 
-  // Расстояние Левенштейна — для допуска опечаток при поиске.
   function levenshtein(a, b){
     a = a || ''; b = b || '';
     var m = a.length, n = b.length;
@@ -2634,8 +2622,6 @@ onmessage=e=>{
     return false;
   }
 
-  // Проверка совпадения имени картинки с поисковым запросом:
-  // прямое вхождение + опечатки + запрос в другой раскладке клавиатуры.
   function matchesQuery(name, rawQuery){
     var query = (rawQuery || '').toLowerCase().trim();
     if (!query) return true;
@@ -2655,10 +2641,6 @@ onmessage=e=>{
     }
     return false;
   }
-
-  // ============================================================
-  //  Список вырезок: сортировка, фильтрация, рендер карточек
-  // ============================================================
 
   function getSortedCuts(){
     var arr = cutsMeta.slice();
@@ -2866,12 +2848,6 @@ onmessage=e=>{
     closeModals();
   }
 
-// ============================================================
-  //  Полноэкранный просмотр картинки (лайтбокс)
-  //  Поддерживает зум кнопками, щипком (pinch), двойным тапом
-  //  и перетаскивание увеличенной картинки пальцем.
-  // ============================================================
-
   var imageViewerEl = document.getElementById('image-viewer');
   var imageViewerImg = document.getElementById('image-viewer-img');
   var imageViewerContent = document.getElementById('image-viewer-content');
@@ -2882,7 +2858,7 @@ onmessage=e=>{
   var IV_MAX_SCALE = 6;
 
   var ivScale = 1, ivTx = 0, ivTy = 0;
-  var ivMode = null;              // 'pan' | 'pinch'
+  var ivMode = null;              
   var ivStartDist = 0, ivStartScale = 1;
   var ivStartX = 0, ivStartY = 0, ivStartTx = 0, ivStartTy = 0;
   var ivMoved = false;
@@ -2914,7 +2890,6 @@ onmessage=e=>{
     }
   }
 
-  // Зум с сохранением точки под пальцем (px, py — координаты на экране).
   function ivZoomTo(newScale, px, py, animate){
     newScale = Math.min(IV_MAX_SCALE, Math.max(IV_MIN_SCALE, newScale));
     if (typeof px !== 'number') px = window.innerWidth / 2;
@@ -3011,7 +2986,6 @@ onmessage=e=>{
         var k = target / ivStartScale;
         ivTx = mx - (mx - ivStartTx) * k;
         ivTy = my - (my - ivStartTy) * k;
-        // Смещение середины между пальцами — двигаем картинку вместе с ними.
         var curMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         var curMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         ivTx += curMidX - ivStartX;
@@ -3159,10 +3133,6 @@ onmessage=e=>{
     });
   }
 
-  // ============================================================
-  //  Экран выбора картинок для новой папки / редактирования состава папки
-  // ============================================================
-
   function updatePickerSelectedCount(){
     var count = Object.keys(folderPickerSelection).length;
     var el = document.getElementById('picker-selected-count');
@@ -3220,7 +3190,6 @@ onmessage=e=>{
     setupPickerObserver();
   }
 
-  // Открыть экран выбора картинок для пополнения состава существующей папки.
   function openFolderEditPicker(folderId){
     var folder = foldersMeta.filter(function(f){ return f.id === folderId; })[0];
     if (!folder) return;
@@ -3271,7 +3240,6 @@ onmessage=e=>{
     });
   }
 
-  // Сохранить изменённый состав картинок существующей папки (режим 'edit').
   function saveFolderEdit(){
     var folder = foldersMeta.filter(function(f){ return f.id === editingFolderId; })[0];
     if (!folder){ goBack(); return; }
@@ -3287,13 +3255,6 @@ onmessage=e=>{
     });
   }
 
-  // ============================================================
-  //  Экран "Все папки": каждая папка нарисована целиком, со своими картинками
-  // ============================================================
-
-  // Карточка картинки внутри папки: вместо строки кнопок "Скачать/Удалить"
-  // снизу — компактный оверлей "удалить" (убрать из папки) сверху, чтобы
-  // в ряд помещалось по три картинки, как в остальном списке папки.
   function buildFolderImageCard(folderId, item){
     return (
       '<div class="cut-image" data-id="' + item.id + '">' +
@@ -3303,7 +3264,6 @@ onmessage=e=>{
     );
   }
 
-  // В режиме сбора работы папку можно только выбрать: кнопки правки прячем.
   function buildFolderSection(folder, index){
     if (workFolderPickMode){
       var ids0 = (folder.cutIds || []).filter(function(id){
@@ -3329,8 +3289,6 @@ onmessage=e=>{
       );
     }
     var ids = folder.cutIds || [];
-    // Показываем только те вырезки, которые ещё существуют
-    // (на случай, если файл удалили на экране "Все вырезки").
     var items = ids.map(function(id){
       return cutsMeta.filter(function(c){ return c.id === id; })[0];
     }).filter(Boolean);
@@ -3552,7 +3510,6 @@ onmessage=e=>{
     });
   }
 
-  // --- воркер ---
   function cutMakeWorker(){
     cutKillWorker();
     var blob = new Blob([document.getElementById('workerSrc').textContent], { type:'text/javascript' });
@@ -3751,7 +3708,6 @@ onmessage=e=>{
     cutResetState();
   }
 
-  // --- кнопки ---
   var btnCutsCta = document.getElementById('btn-cuts-cta');
   if (btnCutsCta && cutFileInput){
     btnCutsCta.addEventListener('click', function(){
@@ -3878,10 +3834,7 @@ onmessage=e=>{
 
   function openDislikePopover(anchorBtn){
     var pop = document.getElementById('dislike-popover');
-    var rect = anchorBtn.getBoundingClientRect();
-    pop.classList.remove('hidden');
-    pop.style.top = Math.max(12, rect.top - pop.offsetHeight - 10) + 'px';
-    pop.style.right = Math.max(18, window.innerWidth - rect.right) + 'px';
+    placePopover(pop, anchorBtn.getBoundingClientRect(), false);
     document.getElementById('filter-backdrop').classList.remove('hidden');
     dislikeOpenState = true;
   }
@@ -4019,9 +3972,6 @@ onmessage=e=>{
     if (cutImg && screenStack[screenStack.length-1] === 'screen-cutout-select'){ cutFitCanvas(); }
   });
 
-  // ============================================================
-  //  Создание работы: холст 1280x720, слои картинок и текста
-  // ============================================================
   var WORK_W = 1280, WORK_H = 720;
 
   var WORK_FONTS = [
@@ -4030,15 +3980,62 @@ onmessage=e=>{
     { id:'NunitoBlack', label:'Nunito Black' }
   ];
 
-  var workSelection = {};          // id вырезки -> true (итоговый набор, без дублей)
-  var workManualSelection = {};    // что выбрано тапом по карточке, а не папкой  var workPickerMode = 'new';      // 'new' — новая работа, 'add' — дозагрузка слоёв
+  var workSelection = {};        
+  var workManualSelection = {};    
   var workBg = '#ffffff';
-  var workLayers = [];             // картинки: {id,name,img,scale,x,y,outline,outlineColor,enabled}
-  var workTexts  = [];             // тексты: {text,font,size,color,outline,outlineColor,skew,x,y,enabled}
+  var workLayers = [];             
+  var workTexts  = [];             
   var workCanvas = document.getElementById('work-canvas');
   var workDragTarget = null, workDragOff = null;
+  var workCanvasDrag = true;    
+  var workCanvasPinned = true;   
 
-  // --- выбор картинок ---
+  function workSyncCanvasOpts(){
+    var box    = document.querySelector('#screen-work-build .work-canvas-box');
+    var head   = document.querySelector('#screen-work-build .work-head');
+    var scroll = document.getElementById('work-scroll');
+
+    var dragBtn = document.getElementById('btn-work-drag');
+    if (dragBtn){
+      dragBtn.textContent = workCanvasDrag ? 'включено' : 'выключено';
+      dragBtn.classList.toggle('pill-btn-success', workCanvasDrag);
+      dragBtn.classList.toggle('pill-btn-danger', !workCanvasDrag);
+    }
+    var pinBtn = document.getElementById('btn-work-pin');
+    if (pinBtn){
+      pinBtn.textContent = workCanvasPinned ? 'закреплён' : 'откреплён';
+      pinBtn.classList.toggle('pill-btn-success', workCanvasPinned);
+      pinBtn.classList.toggle('pill-btn-danger', !workCanvasPinned);
+    }
+    if (!box || !head || !scroll) return;
+
+    box.classList.toggle('free', !workCanvasDrag);
+    if (workCanvasPinned){
+      if (box.parentNode !== head) head.appendChild(box);
+    } else {
+      if (box.parentNode !== scroll) scroll.insertBefore(box, scroll.firstChild);
+    }
+  }
+  workSyncCanvasOpts();
+
+  var btnWorkDrag = document.getElementById('btn-work-drag');
+  if (btnWorkDrag){
+    btnWorkDrag.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      workCanvasDrag = !workCanvasDrag;
+      workDragTarget = null;
+      workSyncCanvasOpts();
+    });
+  }
+  var btnWorkPin = document.getElementById('btn-work-pin');
+  if (btnWorkPin){
+    btnWorkPin.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      workCanvasPinned = !workCanvasPinned;
+      workSyncCanvasOpts();
+    });
+  }
+
   function workUpdateSelectedCount(){
     var n = Object.keys(workSelection).length;
     var el = document.getElementById('work-selected-count');
@@ -4088,7 +4085,6 @@ onmessage=e=>{
     workSelectedFolders = {};
     if (workPickerMode === 'new'){ workSelection = {}; workManualSelection = {}; }
     else {
-      // Дозагрузка: уже добавленные слои отмечены, чтобы их не продублировать.
       workSelection = {}; workManualSelection = {};
       workLayers.forEach(function(l){ workSelection[l.id] = true; workManualSelection[l.id] = true; });
     }
@@ -4141,7 +4137,6 @@ onmessage=e=>{
     workRenderPicker();
   }
 
-  // --- сборка слоёв ---
   function workLoadImage(id){
     return dbGetBlob(id).then(function(blob){
       if (!blob) return null;
@@ -4178,7 +4173,6 @@ onmessage=e=>{
     });
   }
 
-  // Раскладываем картинки в ряд по центру — стартовая расстановка.
   function workAutoLayout(){
     var n = workLayers.length;
     if (!n) return;
@@ -4190,9 +4184,7 @@ onmessage=e=>{
     });
   }
 
-  // --- отрисовка ---
   function workLayerBox(l){
-    // Базовый размер: картинка вписывается в 62% высоты холста при scale=1.
     var base = (WORK_H * 0.62) / l.img.height;
     var w = l.img.width * base * l.scale;
     var h = l.img.height * base * l.scale;
@@ -4211,8 +4203,6 @@ onmessage=e=>{
       if (!l.enabled || !l.img) return;
       var b = workLayerBox(l);
       if (l.outline > 0){
-        // Обводка силуэтом: рисуем картинку по кругу смещений, затем
-        // перекрашиваем всё в цвет обводки через source-in на буфере.
         var pad = l.outline * 4;
         var oc = document.createElement('canvas');
         oc.width = Math.max(1, Math.ceil(b.w + pad*2));
@@ -4251,9 +4241,9 @@ onmessage=e=>{
     ctx.restore();
   }
 
-  // --- перетаскивание слоёв прямо по холсту ---
   if (workCanvas){
     workCanvas.addEventListener('pointerdown', function(e){
+      if (!workCanvasDrag) return;       
       var r = workCanvas.getBoundingClientRect();
       var px = (e.clientX - r.left) * WORK_W / r.width;
       var py = (e.clientY - r.top)  * WORK_H / r.height;
@@ -4285,7 +4275,6 @@ onmessage=e=>{
     });
   }
 
-  // --- панели управления ---
   function workSlider(label, hint, min, max, step, val, kind, idx, key){
     return '<div class="work-row work-slider-row">' +
       '<span class="work-label">' + label + (hint ? '<small>' + hint + '</small>' : '') + '</span>' +
@@ -4296,7 +4285,6 @@ onmessage=e=>{
     '</div>';
   }
 
-  // Три кружка: белый, чёрный и свой цвет через нативный пикер.
   function workColorSet(val, act, idx){
     var v = (val || '#ffffff').toLowerCase();
     var isW = v === '#ffffff', isB = v === '#000000';
@@ -4314,7 +4302,6 @@ onmessage=e=>{
   }
 
   function workRenderControls(){
-    // тексты
     var tl = document.getElementById('work-text-list');
     if (tl){
       var th = '';
@@ -4350,7 +4337,6 @@ onmessage=e=>{
       tl.innerHTML = th;
     }
 
-    // картинки
     var ll = document.getElementById('work-layer-list');
     if (ll){
       var lh = '';
@@ -4376,7 +4362,6 @@ onmessage=e=>{
     }
   }
 
-  // --- события панелей ---
   var workScrollEl = document.getElementById('work-scroll');
   if (workScrollEl){
     workScrollEl.addEventListener('input', function(e){
@@ -4406,7 +4391,6 @@ onmessage=e=>{
       var act = btn.getAttribute('data-act');
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 
-      // Пресетные кружки белого и чёрного.
       var preset = btn.getAttribute('data-color');
       if (preset){
         if (act === 'text-color') workTexts[idx].color = preset;
@@ -4483,7 +4467,6 @@ onmessage=e=>{
     });
   }
 
-  // --- экран выбора: события ---
   var workGrid = document.getElementById('work-picker-grid');
   if (workGrid){
     workGrid.addEventListener('click', function(e){
@@ -4517,7 +4500,6 @@ onmessage=e=>{
       if (filterOpenState){ closeFilterPopover(); } else { openFilterPopover(btnWorkFilter); }
     });
   }
-  // Кнопка папок: показываем список папок, тап по папке берёт её целиком.
   var btnWorkFolders = document.getElementById('btn-work-folders');
   if (btnWorkFolders){
     btnWorkFolders.addEventListener('click', function(){
@@ -4552,9 +4534,12 @@ onmessage=e=>{
   }
 
   function workReset(){
-    workSelection = {}; workLayers = []; workTexts = [];
+    workSelection = {}; workManualSelection = {}; workSelectedFolders = {};
+    workLayers = []; workTexts = [];
     workBg = '#ffffff';
-    if (workBgInput) workBgInput.value = '#ffffff';
+    workCanvasDrag = true; workCanvasPinned = true;
+    workRenderBgRow();
+    workSyncCanvasOpts();
     workRenderControls(); workDraw();
   }
   var workResetYes = document.getElementById('work-reset-yes-btn');
@@ -4568,7 +4553,6 @@ onmessage=e=>{
   var workResetNo = document.getElementById('work-reset-no-btn');
   if (workResetNo) workResetNo.addEventListener('click', closeModals);
 
-  // --- Навигация с главного экрана ---
   var btnCut = document.getElementById('btn-cut');
   var btnCreate = document.getElementById('btn-create');
   if (btnCut){
@@ -4584,7 +4568,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Кнопка "+" (fab) — открыть окно загрузки новой вырезки ---
   var btnAdd = document.getElementById('btn-add');
   if (btnAdd){
     btnAdd.addEventListener('click', function(){
@@ -4593,7 +4576,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Кнопка "папки" на экране "Все вырезки" — открыть список созданных папок ---
   var btnFolders = document.getElementById('btn-folders');
   if (btnFolders){
     btnFolders.addEventListener('click', function(){
@@ -4603,7 +4585,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Экран "Все папки": кнопка "Создать папку" в шапке ---
   var btnFoldersCreate = document.getElementById('btn-folders-create');
   if (btnFoldersCreate){
     btnFoldersCreate.addEventListener('click', function(){
@@ -4623,7 +4604,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Клики внутри списка папок: добавить картинки / удалить папку / убрать картинку / посмотреть крупно ---
   var foldersList = document.getElementById('folders-list');
   if (foldersList){
     foldersList.addEventListener('click', function(e){
@@ -4682,7 +4662,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Поиск + крестик очистки на экране выбора картинок для папки ---
   var pickerSearchInputEl = document.getElementById('picker-search-input');
   var pickerSearchClearBtn = document.getElementById('picker-search-clear');
   if (pickerSearchInputEl){
@@ -4726,7 +4705,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Клики по карточкам на экране выбора картинок для папки: переключение выбора ---
   var pickerGrid = document.getElementById('picker-grid');
   if (pickerGrid){
     pickerGrid.addEventListener('click', function(e){
@@ -4746,7 +4724,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Кнопка "закрыть" на экране выбора картинок для папки ---
   var btnPickerClose = document.getElementById('btn-picker-close');
   if (btnPickerClose){
     btnPickerClose.addEventListener('click', function(){
@@ -4757,7 +4734,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Кнопка "фильтровать" на экране выбора картинок для папки ---
   var btnPickerFilter = document.getElementById('btn-picker-filter');
   if (btnPickerFilter){
     btnPickerFilter.addEventListener('click', function(){
@@ -4765,7 +4741,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Кнопка "Сохранить" — сохранить выбранные картинки в редактируемую папку ---
   var btnPickerNext = document.getElementById('btn-picker-next');
   if (btnPickerNext){
     btnPickerNext.addEventListener('click', function(){
@@ -4775,7 +4750,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Окно загрузки новой картинки ---
   var uploadDropzone = document.getElementById('upload-dropzone');
   var uploadFileInput = document.getElementById('upload-file-input');
   var uploadNameInput = document.getElementById('upload-name-input');
@@ -4794,7 +4768,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Окно подтверждения удаления (используется для вырезок, папок и "убрать из папки") ---
   var deleteCancelBtn = document.getElementById('delete-cancel-btn');
   var deleteConfirmBtn = document.getElementById('delete-confirm-btn');
   if (deleteCancelBtn){
@@ -4806,7 +4779,6 @@ onmessage=e=>{
   }
   if (deleteConfirmBtn){ deleteConfirmBtn.addEventListener('click', confirmDelete); }
 
-  // --- Окно ввода имени папки ---
   var folderNameInput = document.getElementById('folder-name-input');
   var folderNameCancelBtn = document.getElementById('folder-name-cancel-btn');
   var folderNameCreateBtn = document.getElementById('folder-name-create-btn');
@@ -4819,10 +4791,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Закрытие модалки тапом по затемнённому фону ---
-  // "Новая вырезка" и "Новая папка" содержат несохранённый ввод, поэтому
-  // случайный тап по пустому месту их не закрывает — только явные кнопки.
-  // Окно подтверждения удаления ничего не теряет, поэтому его можно закрыть тапом мимо.
   var modalOverlay = document.getElementById('modal-overlay');
   if (modalOverlay){
     modalOverlay.addEventListener('click', function(e){
@@ -4836,7 +4804,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Попап "фильтровать" (экран "Все вырезки") ---
   var btnFilter = document.getElementById('btn-filter');
   var filterPopoverEl = document.getElementById('filter-popover');
   var filterBackdropEl = document.getElementById('filter-backdrop');
@@ -4870,13 +4837,28 @@ onmessage=e=>{
     }
   }
 
+  function placePopover(pop, rect, below){
+    pop.style.right = 'auto';
+    pop.style.left = '0px';
+    pop.style.top = '0px';
+    pop.classList.remove('hidden');          
+    var pw = pop.offsetWidth, ph = pop.offsetHeight;
+    var pad = 12;
+
+    var left = rect.right - pw;                                  
+    left = Math.max(pad, Math.min(window.innerWidth - pw - pad, left));
+
+    var top = below ? (rect.bottom + 8) : (rect.top - ph - 10);
+    top = Math.max(pad, Math.min(window.innerHeight - ph - pad, top));
+
+    pop.style.left = left + 'px';
+    pop.style.top  = top + 'px';
+  }
+
   function openFilterPopover(anchorBtn){
     var pop = document.getElementById('filter-popover');
-    var rect = anchorBtn.getBoundingClientRect();
-    pop.style.top = (rect.bottom + 8) + 'px';
-    pop.style.right = Math.max(18, window.innerWidth - rect.right) + 'px';
     updateFilterCheckmarks();
-    pop.classList.remove('hidden');
+    placePopover(pop, anchorBtn.getBoundingClientRect(), true);
     document.getElementById('filter-backdrop').classList.remove('hidden');
     filterOpenState = true;
   }
