@@ -106,12 +106,28 @@
     color:#dde3e5;
   }
 
-  /* --- Главное меню --- */
   #screen-menu h1{
     font-size:26px;
     font-weight:700;
     margin:4px 0 16px;
     color:#ffffff;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .version-badge{
+    display:inline-flex;
+    align-items:center;
+    background:var(--btn-cut-bg);
+    color:var(--btn-cut-text);
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:0.2px;
+    padding:4px 11px;
+    border-radius:999px;
+    line-height:1.2;
+    transform:translateY(1px);
   }
   #screen-menu .buttons{
     margin-top:auto;
@@ -737,14 +753,17 @@
   .cutout-title span{ color:var(--text-secondary); font-weight:600; }
   .cutout-body{
     flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch; touch-action:pan-y;
     display:flex; flex-direction:column; align-items:center; gap:16px;
-    padding-bottom:calc(var(--safe-bottom) + 118px);
+    padding-bottom:calc(var(--safe-bottom) + 150px);
     scrollbar-width:none;
   }
+  .cutout-body > .blockquote{ width:100%; align-self:stretch; }
   .cutout-body::-webkit-scrollbar{ display:none; }
 
   .cutout-stage{ position:relative; line-height:0; border-radius:14px; overflow:hidden; background:var(--placeholder-bg); }
   #cutout-view{ display:block; max-width:100%; }
+  .cutout-stage{ -webkit-user-select:none; user-select:none; }
   #cutout-overlay{ position:absolute; inset:0; touch-action:none; }
 
   .cutout-hint{ color:#4d4d55; font-size:16px; text-align:center; }
@@ -755,9 +774,11 @@
   .cutout-reselect:active{ opacity:0.85; }
 
   .cutout-result-box{
-    width:100%; background:var(--placeholder-bg); border-radius:18px; padding:18px;
+    width:100%; align-self:stretch;
+    background:var(--placeholder-bg); border-radius:18px; padding:18px;
     display:flex; align-items:center; justify-content:center;
   }
+  .cutout-result-box:active{ opacity:0.9; }
   .cutout-result-box img{ max-width:100%; max-height:44vh; object-fit:contain; display:block; }
   .cutout-download{
     border:none; background:var(--btn-cut-bg); color:var(--btn-cut-text);
@@ -769,6 +790,7 @@
     background:var(--fab-bg); color:#fff; display:flex; align-items:center; justify-content:center;
   }
   .cutout-vote:active{ opacity:0.85; }
+  .cutout-vote-down svg{ transform:rotate(180deg); }
 
   .cutout-progress{
     position:fixed; inset:0; z-index:1100;
@@ -801,7 +823,7 @@
   </div>
 
   <div id="screen-menu" class="screen">
-    <h1>Главное меню</h1>
+    <h1>Главное меню <span class="version-badge" id="app-version">v1.0</span></h1>
     <div class="blockquote">
       Это главное меню бота. При нажатии на кнопку <b>«Вырезать»</b> вы можете вырезать нужный фрагмент из скриншота, скачать его или добавить в работу. Кнопка <b>«Создать»</b> позволяет выбрать всех вырезанных персонажей и добавить их в проект, который в дальнейшем можно редактировать. Кнопка <b>«Сохранённые»</b> позволяет легко вернуться к шаблону недавней работы.
     </div>
@@ -925,7 +947,7 @@
   <div id="screen-cutout-result" class="screen">
     <h2 class="cutout-title">Вырезание&nbsp;- <span>2 шаг</span></h2>
     <div class="cutout-body">
-      <div class="cutout-result-box"><img id="cutout-result-img" alt="" draggable="false"></div>
+      <div class="cutout-result-box" id="cutout-result-box"><img id="cutout-result-img" alt="" draggable="false"></div>
       <button class="cutout-download" id="btn-cutout-download" type="button">скачать</button>
       <div class="blockquote">
         Если Вас устраивает, как обрезана картинка, поставьте <b>лайк</b>.<br>
@@ -937,8 +959,8 @@
       <button class="cutout-vote" id="btn-cutout-like" type="button" aria-label="Нравится">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3zM7 10l4.2-7a2 2 0 0 1 3.6 1.5L14 9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.8 20H7"/></svg>
       </button>
-      <button class="cutout-vote" id="btn-cutout-dislike" type="button" aria-label="Не нравится">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="rotate(180)"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3zM7 10l4.2-7a2 2 0 0 1 3.6 1.5L14 9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.8 20H7"/></svg>
+      <button class="cutout-vote cutout-vote-down" id="btn-cutout-dislike" type="button" aria-label="Не нравится">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3zM7 10l4.2-7a2 2 0 0 1 3.6 1.5L14 9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.8 20H7"/></svg>
       </button>
     </div>
   </div>
@@ -1917,6 +1939,8 @@ onmessage=e=>{
 
 <script>
 (function(){
+  var APP_VERSION = '0.0.1(1)';
+
   var ALLOWED_USER_ID = 1781692500;
 
   var tg = window.Telegram ? window.Telegram.WebApp : null;
@@ -3079,10 +3103,13 @@ onmessage=e=>{
 
   loadCutsFromDB();
 
+  var versionBadgeEl = document.getElementById('app-version');
+  if (versionBadgeEl) versionBadgeEl.textContent = 'v' + APP_VERSION;
+
   var CUT_PROC_MAX = 700, CUT_PIX_CAP = 820000, CUT_ITERS = 8, CUT_RENDER_CAP = 1800;
   var CUT_EDGE_LO = 0.32, CUT_EDGE_SPAN = 0.36;
 
-  var cutImg = null, cutScale = 1, cutSel = null, cutStart = null, cutDragging = false;
+  var cutImg = null, cutScale = 1, cutDpr = 1, cutSel = null, cutStart = null, cutDragging = false;
   var cutWorker = null, cutPw = 0, cutPh = 0, cutCrop = null;
   var cutResultBlob = null, cutResultUrl = null, cutBusy = false;
 
@@ -3115,24 +3142,41 @@ onmessage=e=>{
   // --- холст и рамка ---
   function cutFitCanvas(){
     var stage = document.getElementById('cutout-stage');
-    var maxW = stage.parentNode.clientWidth || window.innerWidth - 36;
-    var maxH = Math.max(180, Math.round((window.innerHeight || 640) * 0.34));
-    cutScale = Math.min(1, maxW / cutImg.width, maxH / cutImg.height);
-    var w = Math.round(cutImg.width * cutScale), h = Math.round(cutImg.height * cutScale);
+    var maxW = stage.parentNode.clientWidth || (window.innerWidth - 36);
+    var maxH = Math.max(200, Math.round((window.innerHeight || 640) * 0.42));
+
+    var fit = Math.min(1, maxW / cutImg.width, maxH / cutImg.height);
+    var cssW = Math.max(1, Math.round(cutImg.width * fit));
+    var cssH = Math.max(1, Math.round(cutImg.height * fit));
+
+    var dpr = Math.min(3, window.devicePixelRatio || 1);
+    var w = Math.round(cssW * dpr), h = Math.round(cssH * dpr);
+
+    cutScale = w / cutImg.width;
+
     cutView.width = w; cutView.height = h;
+    cutView.style.width = cssW + 'px'; cutView.style.height = cssH + 'px';
     cutOverlayCvs.width = w; cutOverlayCvs.height = h;
-    cutOverlayCvs.style.width = w + 'px'; cutOverlayCvs.style.height = h + 'px';
-    cutView.getContext('2d').drawImage(cutImg, 0, 0, w, h);
+    cutOverlayCvs.style.width = cssW + 'px'; cutOverlayCvs.style.height = cssH + 'px';
+
+    var vc = cutView.getContext('2d');
+    vc.imageSmoothingEnabled = true;
+    vc.imageSmoothingQuality = 'high';
+    vc.clearRect(0, 0, w, h);
+    vc.drawImage(cutImg, 0, 0, w, h);
+
+    cutDpr = dpr;
     cutRedraw();
   }
   function cutRedraw(){
     var c = cutOverlayCvs.getContext('2d');
     c.clearRect(0, 0, cutOverlayCvs.width, cutOverlayCvs.height);
     if (!cutSel) return;
+    var lw = 2 * (cutDpr || 1);
     c.fillStyle = 'rgba(239,60,49,0.28)';
     c.fillRect(cutSel.x, cutSel.y, cutSel.w, cutSel.h);
-    c.strokeStyle = '#ef3c31'; c.lineWidth = 2;
-    c.strokeRect(cutSel.x + 1, cutSel.y + 1, cutSel.w - 2, cutSel.h - 2);
+    c.strokeStyle = '#ef3c31'; c.lineWidth = lw;
+    c.strokeRect(cutSel.x + lw/2, cutSel.y + lw/2, cutSel.w - lw, cutSel.h - lw);
   }
   function cutPos(e){
     var r = cutOverlayCvs.getBoundingClientRect();
@@ -3142,7 +3186,8 @@ onmessage=e=>{
     };
   }
   function cutUpdateSelUI(){
-    var has = !!(cutSel && cutSel.w >= 12 && cutSel.h >= 12);
+    var min = 12 * (cutDpr || 1);
+    var has = !!(cutSel && cutSel.w >= min && cutSel.h >= min);
     if (cutReselectBtn) cutReselectBtn.classList.toggle('hidden', !has);
     if (cutNextBtn) cutNextBtn.classList.toggle('hidden', !has);
   }
@@ -3164,7 +3209,8 @@ onmessage=e=>{
     cutOverlayCvs.addEventListener('pointerup', function(){
       if (!cutDragging) return;
       cutDragging = false;
-      if (cutSel && (cutSel.w < 12 || cutSel.h < 12)) cutSel = null;
+      var min = 12 * (cutDpr || 1);
+      if (cutSel && (cutSel.w < min || cutSel.h < min)) cutSel = null;
       cutRedraw(); cutUpdateSelUI();
       if (cutSel && tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
     });
@@ -3387,6 +3433,16 @@ onmessage=e=>{
       });
     });
   }
+
+  var cutResultBox = document.getElementById('cutout-result-box');
+  if (cutResultBox){
+    cutResultBox.addEventListener('click', function(){
+      if (!cutResultUrl) return;
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      openImageViewerWithUrl(cutResultUrl, false);
+    });
+  }
+
   var btnCutoutCancel = document.getElementById('btn-cutout-cancel');
   if (btnCutoutCancel){
     btnCutoutCancel.addEventListener('click', function(){
@@ -3394,7 +3450,6 @@ onmessage=e=>{
       cutGoToCuts();
     });
   }
-  // Лайк/дизлайк пока без логики
   ['btn-cutout-like','btn-cutout-dislike'].forEach(function(id){
     var b = document.getElementById(id);
     if (b) b.addEventListener('click', function(){
