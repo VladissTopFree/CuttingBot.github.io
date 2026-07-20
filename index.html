@@ -731,6 +731,65 @@
     color:#555;
     font-size:14px;
   }
+
+  #screen-cutout-select, #screen-cutout-result{ padding-bottom:0; }
+  .cutout-title{ font-size:22px; font-weight:700; color:#fff; margin:4px 0 18px; flex-shrink:0; }
+  .cutout-title span{ color:var(--text-secondary); font-weight:600; }
+  .cutout-body{
+    flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+    display:flex; flex-direction:column; align-items:center; gap:16px;
+    padding-bottom:calc(var(--safe-bottom) + 118px);
+    scrollbar-width:none;
+  }
+  .cutout-body::-webkit-scrollbar{ display:none; }
+
+  .cutout-stage{ position:relative; line-height:0; border-radius:14px; overflow:hidden; background:var(--placeholder-bg); }
+  #cutout-view{ display:block; max-width:100%; }
+  #cutout-overlay{ position:absolute; inset:0; touch-action:none; }
+
+  .cutout-hint{ color:#4d4d55; font-size:16px; text-align:center; }
+  .cutout-reselect{
+    border:none; background:var(--btn-delete-bg); color:var(--btn-delete-text);
+    padding:14px 26px; border-radius:16px; font-size:17px; font-weight:600;
+  }
+  .cutout-reselect:active{ opacity:0.85; }
+
+  .cutout-result-box{
+    width:100%; background:var(--placeholder-bg); border-radius:18px; padding:18px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .cutout-result-box img{ max-width:100%; max-height:44vh; object-fit:contain; display:block; }
+  .cutout-download{
+    border:none; background:var(--btn-cut-bg); color:var(--btn-cut-text);
+    padding:15px 46px; border-radius:16px; font-size:20px; font-weight:600;
+  }
+  .cutout-download:active{ opacity:0.85; }
+  .cutout-vote{
+    flex-shrink:0; width:52px; height:52px; border-radius:50%; border:none;
+    background:var(--fab-bg); color:#fff; display:flex; align-items:center; justify-content:center;
+  }
+  .cutout-vote:active{ opacity:0.85; }
+
+  .cutout-progress{
+    position:fixed; inset:0; z-index:1100;
+    background:rgba(10,10,12,0.78);
+    -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .cutout-progress-card{
+    width:100%; max-width:320px; background:var(--panel-bg);
+    border-radius:22px; padding:26px 22px; text-align:center;
+  }
+  .cutout-spinner{
+    width:38px; height:38px; margin:0 auto 14px; border-radius:50%;
+    border:3px solid rgba(255,255,255,0.12); border-top-color:var(--accent);
+    animation:cutSpin 0.9s linear infinite;
+  }
+  @keyframes cutSpin{ to{ transform:rotate(360deg); } }
+  .cutout-progress-title{ color:#fff; font-size:16px; font-weight:700; margin-bottom:6px; }
+  .cutout-progress-status{ color:var(--text-secondary); font-size:13px; min-height:18px; margin-bottom:14px; }
+  .cutout-progress-bar{ height:4px; border-radius:2px; background:#2a2a30; overflow:hidden; }
+  .cutout-progress-bar>div{ height:100%; width:0; background:var(--accent); transition:width 0.25s; }
 </style>
 </head>
 <body>
@@ -846,6 +905,56 @@
     </div>
   </div>
 
+  <!-- Экран 1: выделение области -->
+  <div id="screen-cutout-select" class="screen">
+    <h2 class="cutout-title">Вырезание&nbsp;- <span>1 шаг</span></h2>
+    <div class="cutout-body">
+      <div class="cutout-stage" id="cutout-stage">
+        <canvas id="cutout-view"></canvas>
+        <canvas id="cutout-overlay"></canvas>
+      </div>
+      <div class="cutout-hint">Выдели область для вырезания</div>
+      <button class="cutout-reselect hidden" id="btn-cutout-reselect" type="button">перевыбрать область</button>
+    </div>
+    <div class="cuts-bottombar">
+      <button class="cta-btn hidden" id="btn-cutout-next" type="button" style="width:100%">Далее</button>
+    </div>
+  </div>
+
+  <!-- Экран 2: результат -->
+  <div id="screen-cutout-result" class="screen">
+    <h2 class="cutout-title">Вырезание&nbsp;- <span>2 шаг</span></h2>
+    <div class="cutout-body">
+      <div class="cutout-result-box"><img id="cutout-result-img" alt="" draggable="false"></div>
+      <button class="cutout-download" id="btn-cutout-download" type="button">скачать</button>
+      <div class="blockquote">
+        Если Вас устраивает, как обрезана картинка, поставьте <b>лайк</b>.<br>
+        Если нет — нажмите <b>дизлайк</b> и укажите, что именно не так.
+      </div>
+    </div>
+    <div class="cuts-bottombar">
+      <button class="cta-btn" id="btn-cutout-cancel" type="button">Отмена</button>
+      <button class="cutout-vote" id="btn-cutout-like" type="button" aria-label="Нравится">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3zM7 10l4.2-7a2 2 0 0 1 3.6 1.5L14 9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.8 20H7"/></svg>
+      </button>
+      <button class="cutout-vote" id="btn-cutout-dislike" type="button" aria-label="Не нравится">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="rotate(180)"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3zM7 10l4.2-7a2 2 0 0 1 3.6 1.5L14 9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.8 20H7"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Окно ожидания вырезания -->
+  <div id="cutout-progress" class="cutout-progress hidden">
+    <div class="cutout-progress-card">
+      <div class="cutout-spinner"></div>
+      <div class="cutout-progress-title">Вырезаем персонажа</div>
+      <div class="cutout-progress-status" id="cutout-progress-status">Готовим картинку…</div>
+      <div class="cutout-progress-bar"><div id="cutout-progress-fill"></div></div>
+    </div>
+  </div>
+
+  <input type="file" id="cutout-file-input" accept="image/*" class="hidden">
+
   <!-- Модальные окна: загрузка новой вырезки, подтверждение удаления, имя папки -->
   <div id="modal-overlay" class="modal-overlay hidden">
     <div id="modal-upload" class="modal-card hidden">
@@ -923,23 +1032,897 @@
     </div>
   </div>
 
+<!-- ======================= WORKER ======================= -->
+<script id="workerSrc" type="javascript/worker">
+'use strict';
+
+/* ================= Boykov–Kolmogorov max-flow ================= */
+const TERMINAL=-1, ORPHAN=-2, NONE=-3, FREE=0, SRC=1, SNK=2, EPS=1e-9;
+
+function Graph(n,maxArcPairs){
+  this.n=n;
+  this.head=new Int32Array(maxArcPairs*2);
+  this.nxt =new Int32Array(maxArcPairs*2);
+  this.cap =new Float64Array(maxArcPairs*2);
+  this.first=new Int32Array(n);
+  this.tr=new Float64Array(n);
+  this.parent=new Int32Array(n);
+  this.ts=new Int32Array(n);
+  this.dist=new Int32Array(n);
+  this.tree=new Uint8Array(n);
+  this.inq=new Uint8Array(n);
+  this.q=new Int32Array(n*2);
+  this.na=0;this.qh=0;this.qt=0;this.orph=[];
+  this.reset();
+}
+Graph.prototype.reset=function(){
+  this.na=0;this.qh=0;this.qt=0;this.orph.length=0;
+  this.first.fill(-1);this.tr.fill(0);this.parent.fill(NONE);
+  this.ts.fill(0);this.dist.fill(0);this.tree.fill(FREE);this.inq.fill(0);
+};
+Graph.prototype.addEdge=function(i,j,c1,c2){
+  const a=this.na*2;this.na++;
+  this.head[a]=j;this.cap[a]=c1;this.nxt[a]=this.first[i];this.first[i]=a;
+  this.head[a+1]=i;this.cap[a+1]=c2;this.nxt[a+1]=this.first[j];this.first[j]=a+1;
+};
+Graph.prototype.setActive=function(i){
+  if(this.inq[i])return;
+  this.inq[i]=1;
+  if(this.qt>=this.q.length){
+    const left=this.qt-this.qh;
+    this.q.copyWithin(0,this.qh,this.qt);this.qh=0;this.qt=left;
+    if(this.qt>=this.q.length){const nq=new Int32Array(this.q.length*2);nq.set(this.q);this.q=nq;}
+  }
+  this.q[this.qt++]=i;
+};
+Graph.prototype.nextActive=function(){
+  while(this.qh<this.qt){
+    const i=this.q[this.qh++];this.inq[i]=0;
+    if(this.parent[i]!==NONE)return i;
+  }
+  return -1;
+};
+Graph.prototype.addOrphan=function(i){this.parent[i]=ORPHAN;this.orph.push(i);};
+Graph.prototype.maxflow=function(){
+  const {head,nxt,cap,first,tr,parent,ts,dist,tree}=this;
+  for(let i=0;i<this.n;i++){
+    if(tr[i]>EPS){tree[i]=SRC;parent[i]=TERMINAL;dist[i]=1;ts[i]=0;this.setActive(i);}
+    else if(tr[i]<-EPS){tree[i]=SNK;parent[i]=TERMINAL;dist[i]=1;ts[i]=0;this.setActive(i);}
+    else{tree[i]=FREE;parent[i]=NONE;}
+  }
+  let time=0,cur=-1;
+  for(;;){
+    let i=cur;
+    if(i!==-1&&parent[i]===NONE)i=-1;
+    if(i===-1){i=this.nextActive();if(i===-1)break;}
+    let found=-1;
+    const ti=tree[i];
+    for(let a=first[i];a!==-1;a=nxt[a]){
+      const c = ti===SRC ? cap[a] : cap[a^1];
+      if(c<=EPS)continue;
+      const j=head[a];
+      if(tree[j]===FREE){
+        tree[j]=ti;parent[j]=a^1;ts[j]=ts[i];dist[j]=dist[i]+1;this.setActive(j);
+      }else if(tree[j]!==ti){ found = ti===SRC ? a : (a^1); break; }
+      else if(ts[j]<=ts[i]&&dist[j]>dist[i]+1){ parent[j]=a^1;ts[j]=ts[i];dist[j]=dist[i]+1; }
+    }
+    time++;
+    if(found>=0){
+      cur=i;
+      this.augment(found);
+      while(this.orph.length){
+        const o=this.orph.pop();
+        if(parent[o]!==ORPHAN)continue;
+        this.adopt(o,time);
+      }
+    }else cur=-1;
+  }
+};
+Graph.prototype.augment=function(a){
+  const {head,cap,parent,tr}=this;
+  let i=head[a^1], j=head[a], bn=cap[a], k;
+  for(k=i;;){const p=parent[k];if(p===TERMINAL)break;const d=cap[p^1];if(d<bn)bn=d;k=head[p];}
+  if(tr[k]<bn)bn=tr[k];
+  for(k=j;;){const p=parent[k];if(p===TERMINAL)break;const d=cap[p];if(d<bn)bn=d;k=head[p];}
+  if(-tr[k]<bn)bn=-tr[k];
+
+  cap[a^1]+=bn;cap[a]-=bn;
+  for(k=i;;){
+    const p=parent[k];if(p===TERMINAL)break;
+    cap[p]+=bn;cap[p^1]-=bn;
+    if(cap[p^1]<=EPS)this.addOrphan(k);
+    k=head[p];
+  }
+  tr[k]-=bn; if(tr[k]<=EPS)this.addOrphan(k);
+  for(k=j;;){
+    const p=parent[k];if(p===TERMINAL)break;
+    cap[p^1]+=bn;cap[p]-=bn;
+    if(cap[p]<=EPS)this.addOrphan(k);
+    k=head[p];
+  }
+  tr[k]+=bn; if(tr[k]>=-EPS)this.addOrphan(k);
+};
+Graph.prototype.adopt=function(i,time){
+  const {head,nxt,cap,first,parent,ts,dist,tree}=this;
+  const ti=tree[i];
+  let dMin=Infinity,aMin=NONE;
+  for(let a=first[i];a!==-1;a=nxt[a]){
+    const j=head[a];
+    if(tree[j]!==ti)continue;
+    const c = ti===SRC ? cap[a^1] : cap[a];
+    if(c<=EPS)continue;
+    let j2=j,d=0,ok=true;
+    for(;;){
+      if(ts[j2]===time){d+=dist[j2];break;}
+      const p=parent[j2];d++;
+      if(p===TERMINAL){ts[j2]=time;dist[j2]=1;break;}
+      if(p===ORPHAN||p===NONE){ok=false;break;}
+      j2=head[p];
+    }
+    if(!ok)continue;
+    if(d<dMin){dMin=d;aMin=a;}
+    for(let j3=j;ts[j3]!==time;j3=head[parent[j3]]){ts[j3]=time;dist[j3]=d--;}
+  }
+  if(aMin!==NONE){parent[i]=aMin;ts[i]=time;dist[i]=dMin+1;return;}
+  ts[i]=0;
+  for(let a=first[i];a!==-1;a=nxt[a]){
+    const j=head[a];
+    if(tree[j]!==ti||parent[j]===NONE)continue;
+    const c = ti===SRC ? cap[a^1] : cap[a];
+    if(c>EPS)this.setActive(j);
+    const p=parent[j];
+    if(p!==TERMINAL&&p!==ORPHAN&&head[p]===i)this.addOrphan(j);
+  }
+  tree[i]=FREE;parent[i]=NONE;
+};
+Graph.prototype.inSource=function(i){return this.parent[i]!==NONE&&this.tree[i]===SRC;};
+
+/* ================= GMM ================= */
+const K_FG=6, K_BG=12;   // фон почти всегда пестрее персонажа
+
+function newGMM(K){return{K,w:new Float64Array(K),mean:new Float64Array(K*3),cov:new Float64Array(K*9),
+  inv:new Float64Array(K*9),det:new Float64Array(K),sum:new Float64Array(K*3),
+  prod:new Float64Array(K*9),cnt:new Float64Array(K),total:0};}
+function gmmClear(m){m.sum.fill(0);m.prod.fill(0);m.cnt.fill(0);m.total=0;}
+function gmmAdd(m,k,r,g,b){
+  const s=k*3,p=k*9;
+  m.sum[s]+=r;m.sum[s+1]+=g;m.sum[s+2]+=b;
+  m.prod[p]+=r*r;m.prod[p+1]+=r*g;m.prod[p+2]+=r*b;
+  m.prod[p+3]+=g*r;m.prod[p+4]+=g*g;m.prod[p+5]+=g*b;
+  m.prod[p+6]+=b*r;m.prod[p+7]+=b*g;m.prod[p+8]+=b*b;
+  m.cnt[k]++;m.total++;
+}
+function det3(c,p){
+  return c[p]*(c[p+4]*c[p+8]-c[p+5]*c[p+7])
+       - c[p+1]*(c[p+3]*c[p+8]-c[p+5]*c[p+6])
+       + c[p+2]*(c[p+3]*c[p+7]-c[p+4]*c[p+6]);
+}
+function inv3(c,p,out,d){
+  out[p+0]=(c[p+4]*c[p+8]-c[p+5]*c[p+7])/d; out[p+1]=-(c[p+1]*c[p+8]-c[p+2]*c[p+7])/d;
+  out[p+2]=(c[p+1]*c[p+5]-c[p+2]*c[p+4])/d; out[p+3]=-(c[p+3]*c[p+8]-c[p+5]*c[p+6])/d;
+  out[p+4]=(c[p+0]*c[p+8]-c[p+2]*c[p+6])/d; out[p+5]=-(c[p+0]*c[p+5]-c[p+2]*c[p+3])/d;
+  out[p+6]=(c[p+3]*c[p+7]-c[p+4]*c[p+6])/d; out[p+7]=-(c[p+0]*c[p+7]-c[p+1]*c[p+6])/d;
+  out[p+8]=(c[p+0]*c[p+4]-c[p+1]*c[p+3])/d;
+}
+function gmmLearn(m){
+  for(let k=0;k<m.K;k++){
+    const n=m.cnt[k];
+    if(n<=1){m.w[k]=0;m.det[k]=1;continue;}
+    const s=k*3,p=k*9;
+    const m0=m.sum[s]/n,m1=m.sum[s+1]/n,m2=m.sum[s+2]/n;
+    m.mean[s]=m0;m.mean[s+1]=m1;m.mean[s+2]=m2;
+    const mu=[m0,m1,m2];
+    for(let i=0;i<3;i++)for(let j=0;j<3;j++)m.cov[p+i*3+j]=m.prod[p+i*3+j]/n-mu[i]*mu[j];
+    let d=det3(m.cov,p),guard=0;
+    while(d<=1e-6&&guard++<14){m.cov[p]+=0.05;m.cov[p+4]+=0.05;m.cov[p+8]+=0.05;d=det3(m.cov,p);}
+    m.det[k]=d; inv3(m.cov,p,m.inv,d); m.w[k]=n/m.total;
+  }
+}
+function compProb(m,k,r,g,b){
+  if(m.w[k]<=0||m.det[k]<=0)return 0;
+  const s=k*3,p=k*9,iv=m.inv;
+  const d0=r-m.mean[s],d1=g-m.mean[s+1],d2=b-m.mean[s+2];
+  const q = d0*(d0*iv[p]+d1*iv[p+3]+d2*iv[p+6])
+          + d1*(d0*iv[p+1]+d1*iv[p+4]+d2*iv[p+7])
+          + d2*(d0*iv[p+2]+d1*iv[p+5]+d2*iv[p+8]);
+  return m.w[k]/Math.sqrt(m.det[k])*Math.exp(-0.5*q);
+}
+function totalProb(m,r,g,b){let s=0;for(let k=0;k<m.K;k++)s+=compProb(m,k,r,g,b);return s;}
+function bestComp(m,r,g,b){let bi=0,bv=-1;for(let k=0;k<m.K;k++){const v=compProb(m,k,r,g,b);if(v>bv){bv=v;bi=k;}}return bi;}
+
+/* детерминированный k-means++ по выборке цветов */
+function kmeans(samples,n,iters,K){
+  const cen=new Float64Array(K*3);
+  let seed=12345;const rnd=()=>{seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff;};
+  let idx=Math.floor(rnd()*n);
+  cen[0]=samples[idx*3];cen[1]=samples[idx*3+1];cen[2]=samples[idx*3+2];
+  const d2=new Float64Array(n).fill(Infinity);
+  for(let k=1;k<K;k++){
+    let sum=0;
+    for(let i=0;i<n;i++){
+      const dr=samples[i*3]-cen[(k-1)*3],dg=samples[i*3+1]-cen[(k-1)*3+1],db=samples[i*3+2]-cen[(k-1)*3+2];
+      const d=dr*dr+dg*dg+db*db; if(d<d2[i])d2[i]=d; sum+=d2[i];
+    }
+    let t=rnd()*sum,acc=0,pick=n-1;
+    for(let i=0;i<n;i++){acc+=d2[i];if(acc>=t){pick=i;break;}}
+    cen[k*3]=samples[pick*3];cen[k*3+1]=samples[pick*3+1];cen[k*3+2]=samples[pick*3+2];
+  }
+  const lab=new Uint8Array(n);
+  for(let it=0;it<iters;it++){
+    for(let i=0;i<n;i++){
+      let bi=0,bd=Infinity;
+      for(let k=0;k<K;k++){
+        const dr=samples[i*3]-cen[k*3],dg=samples[i*3+1]-cen[k*3+1],db=samples[i*3+2]-cen[k*3+2];
+        const d=dr*dr+dg*dg+db*db; if(d<bd){bd=d;bi=k;}
+      }
+      lab[i]=bi;
+    }
+    const s=new Float64Array(K*3),c=new Float64Array(K);
+    for(let i=0;i<n;i++){const k=lab[i];s[k*3]+=samples[i*3];s[k*3+1]+=samples[i*3+1];s[k*3+2]+=samples[i*3+2];c[k]++;}
+    for(let k=0;k<K;k++)if(c[k]>0){cen[k*3]=s[k*3]/c[k];cen[k*3+1]=s[k*3+1]/c[k];cen[k*3+2]=s[k*3+2]/c[k];}
+  }
+  return cen;
+}
+const near=(cen,K,r,g,b)=>{let bi=0,bd=Infinity;for(let k=0;k<K;k++){const dr=r-cen[k*3],dg=g-cen[k*3+1],db=b-cen[k*3+2];const d=dr*dr+dg*dg+db*db;if(d<bd){bd=d;bi=k;}}return bi;};
+function centersFrom(rgb,idx,K){
+  const step=Math.max(1,Math.floor(idx.length/(1500*K)));
+  const c=Math.max(K,Math.floor(idx.length/step));
+  const s=new Float64Array(c*3);
+  for(let k=0;k<c;k++){const i=idx[Math.min(idx.length-1,k*step)];s[k*3]=rgb[i*3];s[k*3+1]=rgb[i*3+1];s[k*3+2]=rgb[i*3+2];}
+  return kmeans(s,c,12,K);
+}
+function otsu(vals,lo,hi){
+  const B=128,hist=new Float64Array(B);
+  for(let i=0;i<vals.length;i++){
+    let v=(vals[i]-lo)/(hi-lo); v=v<0?0:v>0.999?0.999:v;
+    hist[(v*B)|0]++;
+  }
+  let total=vals.length,sum=0;
+  for(let b=0;b<B;b++)sum+=b*hist[b];
+  let sumB=0,wB=0,best=0,bestVar=-1;
+  for(let b=0;b<B;b++){
+    wB+=hist[b]; if(!wB)continue;
+    const wF=total-wB; if(!wF)break;
+    sumB+=b*hist[b];
+    const mB=sumB/wB,mF=(sum-sumB)/wF,v=wB*wF*(mB-mF)*(mB-mF);
+    if(v>bestVar){bestVar=v;best=b;}
+  }
+  return lo+(best+1)/B*(hi-lo);
+}
+
+/* ================= морфология и компоненты ================= */
+function morph(mask,w,h,erode){
+  const src=mask.slice();
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    let v=erode?1:0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      const nx=x+dx,ny=y+dy;
+      const s=(nx<0||ny<0||nx>=w||ny>=h)?0:src[ny*w+nx];
+      if(erode){if(!s)v=0;}else{if(s)v=1;}
+    }
+    mask[y*w+x]=v;
+  }
+}
+/* Главная деталь + всё, что стоит вплотную к ней (уши, перчатки, отрезанные
+   тонким перешейком) + крупные самостоятельные куски.                     */
+function keepMain(mask,w,h,minFrac,grow){
+  const n=w*h,lab=new Int32Array(n).fill(-1),st=new Int32Array(n);
+  const sizes=[];let id=0,best=-1,bestSize=0;
+  for(let s=0;s<n;s++){
+    if(!mask[s]||lab[s]!==-1)continue;
+    let sp=0,size=0;st[sp++]=s;lab[s]=id;
+    while(sp){
+      const p=st[--sp];size++;
+      const x=p%w,y=(p/w)|0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        const nx=x+dx,ny=y+dy;
+        if(nx<0||ny<0||nx>=w||ny>=h)continue;
+        const q=ny*w+nx;
+        if(mask[q]&&lab[q]===-1){lab[q]=id;st[sp++]=q;}
+      }
+    }
+    sizes.push(size);
+    if(size>bestSize){bestSize=size;best=id;}
+    id++;
+  }
+  if(id===0)return;
+  const keep=new Uint8Array(id);keep[best]=1;
+  for(let i=0;i<id;i++)if(sizes[i]>=minFrac*bestSize)keep[i]=1;
+  // соседство с главной деталью
+  const nearM=new Uint8Array(n);
+  for(let i=0;i<n;i++)nearM[i]=(lab[i]===best)?1:0;
+  const passes=grow===undefined?3:grow;
+  for(let pass=0;pass<passes;pass++){
+    const nx2=new Uint8Array(nearM);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      if(!nearM[y*w+x])continue;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        const a=x+dx,b=y+dy;
+        if(a<0||b<0||a>=w||b>=h)continue;
+        nx2[b*w+a]=1;
+      }
+    }
+    nearM.set(nx2);
+  }
+  for(let i=0;i<n;i++){
+    const l=lab[i];
+    if(l>=0&&!keep[l]&&nearM[i]&&sizes[l]>bestSize*0.004)keep[l]=1;
+  }
+  for(let i=0;i<n;i++)if(mask[i]&&!keep[lab[i]])mask[i]=0;
+}
+
+/* Вырезание фоновых карманов: заливка идёт от заведомого фона внутрь маски,
+   пиксель снимается, только если он и фоновый по цвету, и отделён от соседа
+   слабым перепадом — то есть заливка не перешагивает настоящий контур.
+   Поэтому чёрные глаза рядом с тёмным фоном остаются: там есть резкая грань. */
+function carve(rgb,mask,w,h,fg,bg,thr,beta){
+  const n=w*h;
+  const d2max=1/Math.max(beta,1e-9);
+  const ratio=new Float32Array(n);
+  for(let i=0;i<n;i++){
+    const r=rgb[i*3],g=rgb[i*3+1],b=rgb[i*3+2];
+    ratio[i]=Math.log(Math.max(totalProb(fg,r,g,b),1e-12))-Math.log(Math.max(totalProb(bg,r,g,b),1e-12));
+  }
+  const st=new Int32Array(n);let sp=0;
+  const seen=new Uint8Array(n),taken=[];
+  let fgCount=0;
+  for(let i=0;i<n;i++){
+    if(mask[i])fgCount++;
+    else{seen[i]=1;st[sp++]=i;}
+  }
+  const grab=(p,q)=>{
+    if(seen[q])return;
+    if(ratio[q]>=-thr)return;
+    const a=p*3,b=q*3;
+    const dr=rgb[a]-rgb[b],dg=rgb[a+1]-rgb[b+1],db=rgb[a+2]-rgb[b+2];
+    if(dr*dr+dg*dg+db*db>d2max)return;
+    seen[q]=1;taken.push(q);st[sp++]=q;
+  };
+  while(sp){
+    const p=st[--sp],x=p%w,y=(p/w)|0;
+    if(x>0)grab(p,p-1);
+    if(x<w-1)grab(p,p+1);
+    if(y>0)grab(p,p-w);
+    if(y<h-1)grab(p,p+w);
+  }
+  if(taken.length>fgCount*0.33)return;     // промах — откатываем
+  for(const q of taken)mask[q]=0;
+}
+
+/* Замкнутая область: глаз это или карман фона — решаем двумя голосами,
+   по локальной палитре вокруг дырки и по цветовым моделям.               */
+function fillHoles(rgb,mask,w,h,fg,bg){
+  const n=w*h,st=new Int32Array(n),seen=new Uint8Array(n);
+  let sp=0;
+  const push=p=>{if(!seen[p]&&!mask[p]){seen[p]=1;st[sp++]=p;}};
+  for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
+  for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
+  while(sp){
+    const p=st[--sp],x=p%w,y=(p/w)|0;
+    if(x>0)push(p-1); if(x<w-1)push(p+1);
+    if(y>0)push(p-w); if(y<h-1)push(p+w);
+  }
+  let obj=0;for(let i=0;i<n;i++)if(mask[i])obj++;
+  const tiny=Math.max(24,obj*0.002);
+  const done=new Uint8Array(n),hole=new Int32Array(n);
+  for(let s=0;s<n;s++){
+    if(mask[s]||seen[s]||done[s])continue;
+    let hp=0;hole[hp++]=s;done[s]=1;
+    const list=[];
+    let x0=w,y0=h,x1=0,y1=0,lfg=0,lbg=0;
+    while(hp){
+      const p=hole[--hp];list.push(p);
+      const x=p%w,y=(p/w)|0;
+      if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y;
+      const r=rgb[p*3],g=rgb[p*3+1],b=rgb[p*3+2];
+      lfg+=Math.log(totalProb(fg,r,g,b)+1e-12);
+      lbg+=Math.log(totalProb(bg,r,g,b)+1e-12);
+      const add=q=>{if(!mask[q]&&!seen[q]&&!done[q]){done[q]=1;hole[hp++]=q;}};
+      if(x>0)add(p-1); if(x<w-1)add(p+1);
+      if(y>0)add(p-w); if(y<h-1)add(p+w);
+    }
+    if(list.length<tiny){for(const p of list)mask[p]=1;continue;}
+    const looksFG = lfg > lbg + 0.15*list.length;
+
+    const r0=Math.max(24,Math.max(x1-x0,y1-y0));
+    const ax0=Math.max(0,x0-r0),ax1=Math.min(w-1,x1+r0);
+    const ay0=Math.max(0,y0-r0),ay1=Math.min(h-1,y1+r0);
+    const palB=[],palF=[];
+    const step=Math.max(1,Math.round(Math.sqrt((ax1-ax0+1)*(ay1-ay0+1)/900)));
+    for(let y=ay0;y<=ay1;y+=step)for(let x=ax0;x<=ax1;x+=step){
+      const p=y*w+x;
+      if(mask[p])palF.push(p); else if(seen[p])palB.push(p);
+    }
+    if(!palB.length||!palF.length){for(const p of list)mask[p]=1;continue;}
+    const dist=(o,pal)=>{
+      let m=Infinity;
+      for(const q of pal){
+        const b=q*3;
+        const dr=rgb[o]-rgb[b],dg=rgb[o+1]-rgb[b+1],db=rgb[o+2]-rgb[b+2];
+        const d=dr*dr+dg*dg+db*db;
+        if(d<m)m=d;
+      }
+      return m;
+    };
+    let bgVotes=0,tested=0;
+    const sk=Math.max(1,Math.floor(list.length/240));
+    for(let i=0;i<list.length;i+=sk){
+      const o=list[i]*3;tested++;
+      if(dist(o,palB)<dist(o,palF))bgVotes++;
+    }
+    if(bgVotes/tested<0.6 || looksFG) for(const p of list)mask[p]=1;
+  }
+}
+function median(mask,w,h,passes){
+  const n=w*h;
+  let a=mask,b=new Uint8Array(n);
+  for(let pass=0;pass<passes;pass++){
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      let s=0,c=0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        const nx=x+dx,ny=y+dy;
+        if(nx<0||ny<0||nx>=w||ny>=h)continue;
+        s+=a[ny*w+nx];c++;
+      }
+      b[y*w+x]=(s*2>c)?1:0;
+    }
+    const t=a;a=b;b=t;
+  }
+  if(a!==mask)mask.set(a);
+}
+
+/* ================= приоры: геодезия и края ================= */
+/* Геодезическое расстояние: цена шага растёт с перепадом цвета, поэтому
+   «дойти» от фона внутрь фигуры, не пересекая контур, дорого. Это и есть
+   формальное объяснение «фон — то, что связано с фоном без пересечения края». */
+function geodesicField(rgb,w,h,seed,rms){
+  const n=w*h,D=new Float32Array(n),INF=1e9;
+  for(let i=0;i<n;i++)D[i]=seed[i]?0:INF;
+  const cd=(i,j)=>{
+    const dr=rgb[i*3]-rgb[j*3],dg=rgb[i*3+1]-rgb[j*3+1],db=rgb[i*3+2]-rgb[j*3+2];
+    return 0.30+Math.sqrt(dr*dr+dg*dg+db*db)/rms;
+  };
+  for(let pass=0;pass<3;pass++){
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const i=y*w+x;let v=D[i];
+      if(x>0){const c=D[i-1]+cd(i,i-1);if(c<v)v=c;}
+      if(y>0){const c=D[i-w]+cd(i,i-w);if(c<v)v=c;}
+      if(y>0&&x>0){const c=D[i-w-1]+1.41*cd(i,i-w-1);if(c<v)v=c;}
+      if(y>0&&x<w-1){const c=D[i-w+1]+1.41*cd(i,i-w+1);if(c<v)v=c;}
+      D[i]=v;
+    }
+    for(let y=h-1;y>=0;y--)for(let x=w-1;x>=0;x--){
+      const i=y*w+x;let v=D[i];
+      if(x<w-1){const c=D[i+1]+cd(i,i+1);if(c<v)v=c;}
+      if(y<h-1){const c=D[i+w]+cd(i,i+w);if(c<v)v=c;}
+      if(y<h-1&&x<w-1){const c=D[i+w+1]+1.41*cd(i,i+w+1);if(c<v)v=c;}
+      if(y<h-1&&x>0){const c=D[i+w-1]+1.41*cd(i,i+w-1);if(c<v)v=c;}
+      D[i]=v;
+    }
+  }
+  return D;
+}
+/* D -> «близость» в [0,1] с устойчивой нормировкой по медиане внутри рамки */
+function closeness(D,w,h,rect){
+  const s=[];
+  for(let y=rect.y;y<rect.y+rect.h;y+=3)for(let x=rect.x;x<rect.x+rect.w;x+=3){
+    const v=D[y*w+x];if(v<1e8)s.push(v);
+  }
+  s.sort((a,b)=>a-b);
+  const med=s.length?s[(s.length/2)|0]:1;
+  const scale=Math.max(1e-3,0.55*med);
+  const out=new Float32Array(D.length);
+  for(let i=0;i<D.length;i++)out[i]=Math.exp(-D[i]/scale);
+  return out;
+}
+function copyGMM(src){
+  const m=newGMM(src.K);
+  m.w.set(src.w);m.mean.set(src.mean);m.cov.set(src.cov);
+  m.inv.set(src.inv);m.det.set(src.det);m.total=src.total;
+  return m;
+}
+
+/* ================= состояние сегментации ================= */
+let S=null;
+const post=(p,t)=>postMessage({type:'progress',p,t});
+const gamma=50, lambda=9*gamma;
+
+function prepare(m){
+  const {rgb,w,h,rect}=m,n=w*h;
+  const diff=(i,j)=>{const dr=rgb[i*3]-rgb[j*3],dg=rgb[i*3+1]-rgb[j*3+1],db=rgb[i*3+2]-rgb[j*3+2];return dr*dr+dg*dg+db*db;};
+  let sum=0,cnt=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x;
+    if(x>0){sum+=diff(i,i-1);cnt++;}
+    if(x>0&&y>0){sum+=diff(i,i-w-1);cnt++;}
+    if(y>0){sum+=diff(i,i-w);cnt++;}
+    if(y>0&&x<w-1){sum+=diff(i,i-w+1);cnt++;}
+  }
+  const beta=sum<=0?0:1/(2*sum/cnt),gdiv=gamma/Math.SQRT2;
+  const wL=new Float32Array(n),wUL=new Float32Array(n),wU=new Float32Array(n),wUR=new Float32Array(n);
+  let arcs=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x;
+    if(x>0){wL[i]=gamma*Math.exp(-beta*diff(i,i-1));arcs++;}
+    if(x>0&&y>0){wUL[i]=gdiv*Math.exp(-beta*diff(i,i-w-1));arcs++;}
+    if(y>0){wU[i]=gamma*Math.exp(-beta*diff(i,i-w));arcs++;}
+    if(x<w-1&&y>0){wUR[i]=gdiv*Math.exp(-beta*diff(i,i-w+1));arcs++;}
+  }
+  const fixedBG=new Uint8Array(n),mask=new Uint8Array(n);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x;
+    const inside=x>=rect.x&&y>=rect.y&&x<rect.x+rect.w&&y<rect.y+rect.h;
+    fixedBG[i]=inside?0:1;mask[i]=inside?1:0;
+  }
+  // тонкая рамка кадра — всегда жёсткий фон
+  for(let x=0;x<w;x++){fixedBG[x]=1;fixedBG[(h-1)*w+x]=1;}
+  for(let y=0;y<h;y++){fixedBG[y*w]=1;fixedBG[y*w+w-1]=1;}
+
+  const rms=Math.max(1,Math.sqrt(sum/Math.max(cnt,1)));
+  const grad=new Float32Array(n);          // сила края, в единицах rms
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x;let mx=0;
+    const chk=j=>{const d=diff(i,j);if(d>mx)mx=d;};
+    if(x>0)chk(i-1); if(x<w-1)chk(i+1);
+    if(y>0)chk(i-w); if(y<h-1)chk(i+w);
+    grad[i]=Math.sqrt(mx)/rms;
+  }
+  S={rgb,w,h,n,rect,beta,rms,grad,fixedBG,hardBG:new Uint8Array(n),mask,
+     comp:new Uint8Array(n),wL,wUL,wU,wUR,
+     fg:newGMM(K_FG),bg:newGMM(K_BG),anchor:newGMM(K_BG),
+     geoBG:null,geoFG:null,
+     uBG:new Float32Array(n),uFG:new Float32Array(n),bgLike:new Uint8Array(n),
+     graph:new Graph(n,arcs),ready:false,
+     tune:m.tune||{fgBias:0,minFrac:0.02,open:false,carve:1.0,geoBG:1.6,geoFG:1.2}};
+}
+
+/* Обучаем две честные модели: персонажа — по уверенному ядру внутри рамки,
+   фон — по всему, что вне рамки, плюс по внутренним пикселям, уверенно
+   опознанным как фон. Ничего не удаляем заранее: спорное решает разрез.  */
+function initModels(){
+  const {rgb,mask,n,w,h,fg,bg,comp,fixedBG,rect}=S;
+  const outIdx=[],inIdx=[];
+  for(let i=0;i<n;i++)(fixedBG[i]?outIdx:inIdx).push(i);
+  const core=new Uint8Array(n);
+  let bgIdx=outIdx.slice();
+
+  if(outIdx.length>K_BG&&inIdx.length>K_FG){
+    const cb=centersFrom(rgb,outIdx,K_BG);
+    gmmClear(bg);
+    for(const i of outIdx){const r=rgb[i*3],g=rgb[i*3+1],b=rgb[i*3+2];gmmAdd(bg,near(cb,K_BG,r,g,b),r,g,b);}
+    gmmLearn(bg);
+    S.anchor=copyGMM(bg);     // палитра заведомого фона; её больше не переучиваем
+    const cost=new Float32Array(inIdx.length);
+    for(let k=0;k<inIdx.length;k++){
+      const i=inIdx[k];
+      cost[k]=-Math.log(totalProb(bg,rgb[i*3],rgb[i*3+1],rgb[i*3+2])+1e-12);
+    }
+    const T=Math.max(3,Math.min(11,otsu(cost,0,20)));
+    for(let k=0;k<inIdx.length;k++)if(cost[k]>T)core[inIdx[k]]=1;
+    morph(core,w,h,true);morph(core,w,h,false);
+    keepMain(core,w,h,0.02,3);
+    bgIdx=[];
+    for(let i=0;i<n;i++)if(!core[i])bgIdx.push(i);
+  }
+  let area=0;for(let i=0;i<n;i++)area+=core[i];
+  if(area<0.04*rect.w*rect.h){                      // ядро не нашлось — берём центр рамки
+    core.fill(0);
+    const cx=rect.x+rect.w/2,cy=rect.y+rect.h/2,ax=rect.w*0.4,ay=rect.h*0.45;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const ex=(x-cx)/ax,ey=(y-cy)/ay;
+      if(ex*ex+ey*ey<=1)core[y*w+x]=1;
+    }
+    bgIdx=[];for(let i=0;i<n;i++)if(!core[i])bgIdx.push(i);
+  }
+  const fgIdx=[];
+  for(let i=0;i<n;i++)if(core[i])fgIdx.push(i);
+  const cf=centersFrom(rgb,fgIdx,K_FG),cb2=centersFrom(rgb,bgIdx,K_BG);
+  gmmClear(fg);gmmClear(bg);
+  for(const i of fgIdx){const r=rgb[i*3],g=rgb[i*3+1],b=rgb[i*3+2];const k=near(cf,K_FG,r,g,b);comp[i]=k;gmmAdd(fg,k,r,g,b);}
+  for(const i of bgIdx){const r=rgb[i*3],g=rgb[i*3+1],b=rgb[i*3+2];const k=near(cb2,K_BG,r,g,b);comp[i]=k;gmmAdd(bg,k,r,g,b);}
+  gmmLearn(fg);gmmLearn(bg);
+  if(S.anchor.total===0)S.anchor=copyGMM(bg);
+  S.geoBG=closeness(geodesicField(rgb,w,h,fixedBG,S.rms),w,h,rect);
+  S.geoFG=closeness(geodesicField(rgb,w,h,core,S.rms),w,h,rect);
+  mask.set(core);
+}
+
+/* Унарные цены считаем один раз на итерацию. Модель фона всегда подмешана
+   якорной палитрой снаружи рамки — так FG-модель не может тихо «выучить»
+   цвета фона и утащить их в персонажа.                                    */
+const ANCHOR_W=0.35;
+function computeUnary(){
+  const {rgb,n,fg,bg,anchor,uBG,uFG,bgLike}=S;
+  for(let i=0;i<n;i++){
+    const r=rgb[i*3],g=rgb[i*3+1],b=rgb[i*3+2];
+    const pb0=totalProb(bg,r,g,b),pa=totalProb(anchor,r,g,b),pf=totalProb(fg,r,g,b);
+    const pb=(1-ANCHOR_W)*pb0+ANCHOR_W*pa;
+    uBG[i]=-Math.log(Math.max(pb,1e-12));
+    uFG[i]=-Math.log(Math.max(pf,1e-12));
+    bgLike[i]=pa>pf?1:0;
+  }
+}
+function buildCut(bias,out){
+  const {w,h,n,fixedBG,hardBG,uBG,uFG,geoBG,geoFG,tune,graph:g,wL,wUL,wU,wUR}=S;
+  g.reset();
+  for(let i=0;i<n;i++){
+    if(fixedBG[i]||hardBG[i]){g.tr[i]=-lambda;continue;}
+    let t=uBG[i]-uFG[i]+bias;
+    if(geoBG)t-=tune.geoBG*geoBG[i];   // дешёвый путь от фона => скорее фон
+    if(geoFG)t+=tune.geoFG*geoFG[i];   // дешёвый путь от ядра => скорее персонаж
+    g.tr[i]=t;
+  }
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x;
+    if(x>0)        g.addEdge(i,i-1,  wL[i], wL[i]);
+    if(x>0&&y>0)   g.addEdge(i,i-w-1,wUL[i],wUL[i]);
+    if(y>0)        g.addEdge(i,i-w,  wU[i], wU[i]);
+    if(x<w-1&&y>0) g.addEdge(i,i-w+1,wUR[i],wUR[i]);
+  }
+  g.maxflow();
+  for(let i=0;i<n;i++)out[i]=(fixedBG[i]||hardBG[i])?0:(g.inSource(i)?1:0);
+}
+/* Критерий «хорошего» вырезания, по которому алгоритм выбирает вариант сам:
+   контур должен идти по настоящим краям картинки, внутри не должно быть
+   цветов фоновой палитры, и граница не должна быть рваной.               */
+function scoreMask(m){
+  const {w,h,grad,bgLike,rect}=S;
+  let area=0,per=0,bsum=0,bgN=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x;
+    if(!m[i])continue;
+    area++; if(bgLike[i])bgN++;
+    const edge=(x===0||y===0||x===w-1||y===h-1)||
+               !m[i-1]||!m[i+1]||!m[i-w]||!m[i+w];
+    if(edge){per++;bsum+=grad[i];}
+  }
+  if(area<0.02*rect.w*rect.h)return -1e9;
+  const align=per?bsum/per:0;
+  return align - 1.5*(bgN/area) - 0.05*(per/Math.sqrt(area));
+}
+const CANDS=[-1.8,-0.9,0,0.9];
+function run(iters,base,span,keepFirst){
+  const {rgb,w,h,n,mask,comp,fg,bg,tune}=S;
+  const tmp=new Uint8Array(n),best=new Uint8Array(n);
+  for(let it=0;it<iters;it++){
+    post(base+span*it/iters,'Итерация '+(it+1)+' из '+iters);
+    let fgCnt=0;for(let i=0;i<n;i++)fgCnt+=mask[i];
+    if(!(it===0&&keepFirst)&&fgCnt>100&&n-fgCnt>100){
+      for(let i=0;i<n;i++)comp[i]=bestComp(mask[i]?fg:bg,rgb[i*3],rgb[i*3+1],rgb[i*3+2]);
+      gmmClear(fg);gmmClear(bg);
+      for(let i=0;i<n;i++){
+        const r=rgb[i*3],gg=rgb[i*3+1],b=rgb[i*3+2];
+        if(mask[i])gmmAdd(fg,comp[i],r,gg,b);else gmmAdd(bg,comp[i],r,gg,b);
+      }
+      gmmLearn(fg);gmmLearn(bg);
+    }
+    computeUnary();
+    if(it===iters-1){
+      let bs=-Infinity,bc=0;
+      for(let c=0;c<CANDS.length;c++){
+        post(base+span*(it+ (c+1)/CANDS.length)/iters,'Подбираем границу '+(c+1)+' из '+CANDS.length);
+        buildCut(tune.fgBias+CANDS[c],tmp);
+        keepMain(tmp,w,h,Math.min(0.02,tune.minFrac),3);
+        const s=scoreMask(tmp);
+        if(s>bs){bs=s;bc=CANDS[c];best.set(tmp);}
+      }
+      mask.set(best);
+      S.pick=bc;
+    }else{
+      buildCut(tune.fgBias,mask);
+      keepMain(mask,w,h,Math.min(0.02,tune.minFrac),3);
+    }
+  }
+}
+/* Найденные фоновые карманы становятся жёстким фоном — следующий проход
+   уже не может вернуть их обратно в персонажа.                           */
+function carveToHard(){
+  const {rgb,mask,w,h,n,fg,bg,beta,tune,hardBG}=S;
+  const before=mask.slice();
+  carve(rgb,mask,w,h,fg,bg,tune.carve,beta);
+  for(let i=0;i<n;i++)if(before[i]&&!mask[i])hardBG[i]=1;
+}
+
+function cleanup(){
+  const {rgb,mask,w,h,fg,bg,beta,tune}=S;
+  if(tune.open){morph(mask,w,h,true);morph(mask,w,h,false);}   // рвём тонкие перемычки с фоном
+  carve(rgb,mask,w,h,fg,bg,tune.carve,beta);
+  keepMain(mask,w,h,tune.minFrac,3);
+  morph(mask,w,h,false);morph(mask,w,h,true);                  // closing: затягиваем щербины
+  fillHoles(rgb,mask,w,h,fg,bg);
+  median(mask,w,h,2);
+}
+
+/* ================= улучшение вырезанного кадра ================= */
+/* 1. Деконтаминация: на полупрозрачных пикселях подмешан цвет фона —
+      затягиваем туда цвет изнутри фигуры. */
+function decontaminate(d,W,H){
+  const N=W*H,solid=new Uint8Array(N);
+  for(let i=0;i<N;i++)solid[i]=d[i*4+3]>=250?1:0;
+  for(let pass=0;pass<4;pass++){
+    const add=[];
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const i=y*W+x;
+      if(solid[i]||d[i*4+3]===0)continue;
+      let r=0,g=0,b=0,n=0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        const a=x+dx,c=y+dy;
+        if(a<0||c<0||a>=W||c>=H)continue;
+        const q=c*W+a;
+        if(!solid[q])continue;
+        r+=d[q*4];g+=d[q*4+1];b+=d[q*4+2];n++;
+      }
+      if(n){d[i*4]=r/n;d[i*4+1]=g/n;d[i*4+2]=b/n;add.push(i);}
+    }
+    if(!add.length)break;
+    for(const i of add)solid[i]=1;
+  }
+}
+/* 2. Билатеральный фильтр — снимает «мошкару» JPEG, не размывая контуры */
+function bilateral(d,W,H,sc,ss){
+  const out=new Float32Array(W*H*3);
+  const inv2c=1/(2*sc*sc),inv2s=1/(2*ss*ss);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const i=y*W+x,o=i*4;
+    if(d[o+3]===0)continue;
+    let wr=0,ar=0,ag=0,ab=0;
+    for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+      const a=x+dx,c=y+dy;
+      if(a<0||c<0||a>=W||c>=H)continue;
+      const q=(c*W+a)*4;
+      if(d[q+3]<8)continue;
+      const dr=d[o]-d[q],dg=d[o+1]-d[q+1],db=d[o+2]-d[q+2];
+      const w=Math.exp(-(dr*dr+dg*dg+db*db)*inv2c-(dx*dx+dy*dy)*inv2s);
+      wr+=w;ar+=w*d[q];ag+=w*d[q+1];ab+=w*d[q+2];
+    }
+    if(wr>0){out[i*3]=ar/wr;out[i*3+1]=ag/wr;out[i*3+2]=ab/wr;}
+  }
+  for(let i=0;i<W*H;i++){
+    if(d[i*4+3]===0)continue;
+    d[i*4]=out[i*3];d[i*4+1]=out[i*3+1];d[i*4+2]=out[i*3+2];
+  }
+}
+/* 3. Ланцош-3 по предумноженным на альфу каналам */
+function lanczosWeights(sn,dn,a){
+  const sc=sn/dn,filt=Math.max(1,sc),sup=a*filt;
+  const idx=[],wt=[];
+  for(let i=0;i<dn;i++){
+    const c=(i+0.5)*sc-0.5;
+    const s=Math.ceil(c-sup),e=Math.floor(c+sup);
+    const ii=[],ww=[];let sum=0;
+    for(let j=s;j<=e;j++){
+      const x=(j-c)/filt;
+      let v;
+      if(x===0)v=1;
+      else if(x<=-a||x>=a)v=0;
+      else v=a*Math.sin(Math.PI*x)*Math.sin(Math.PI*x/a)/(Math.PI*Math.PI*x*x);
+      if(v===0)continue;
+      ii.push(Math.min(sn-1,Math.max(0,j)));ww.push(v);sum+=v;
+    }
+    for(let k=0;k<ww.length;k++)ww[k]/=sum;
+    idx.push(ii);wt.push(ww);
+  }
+  return {idx,wt};
+}
+function resize(d,W,H,dW,dH){
+  const pre=new Float32Array(W*H*4);
+  for(let i=0;i<W*H;i++){
+    const a=d[i*4+3]/255;
+    pre[i*4]=d[i*4]*a;pre[i*4+1]=d[i*4+1]*a;pre[i*4+2]=d[i*4+2]*a;pre[i*4+3]=d[i*4+3];
+  }
+  const hx=lanczosWeights(W,dW,3),hy=lanczosWeights(H,dH,3);
+  const tmp=new Float32Array(dW*H*4);
+  for(let y=0;y<H;y++)for(let x=0;x<dW;x++){
+    const ii=hx.idx[x],ww=hx.wt[x];
+    let r=0,g=0,b=0,al=0;
+    for(let k=0;k<ii.length;k++){
+      const o=(y*W+ii[k])*4,w=ww[k];
+      r+=pre[o]*w;g+=pre[o+1]*w;b+=pre[o+2]*w;al+=pre[o+3]*w;
+    }
+    const o=(y*dW+x)*4;
+    tmp[o]=r;tmp[o+1]=g;tmp[o+2]=b;tmp[o+3]=al;
+  }
+  const out=new Uint8ClampedArray(dW*dH*4);
+  for(let y=0;y<dH;y++){
+    const ii=hy.idx[y],ww=hy.wt[y];
+    for(let x=0;x<dW;x++){
+      let r=0,g=0,b=0,al=0;
+      for(let k=0;k<ii.length;k++){
+        const o=(ii[k]*dW+x)*4,w=ww[k];
+        r+=tmp[o]*w;g+=tmp[o+1]*w;b+=tmp[o+2]*w;al+=tmp[o+3]*w;
+      }
+      al=al<0?0:al>255?255:al;
+      const o=(y*dW+x)*4,f=al>0.5?255/al:0;
+      out[o]=r*f;out[o+1]=g*f;out[o+2]=b*f;out[o+3]=al;
+    }
+  }
+  return out;
+}
+/* 4. Нерезкая маска — возвращает микроконтраст */
+function unsharp(d,W,H,amount){
+  const N=W*H,blur=new Float32Array(N*3),k=[1,2,1,2,4,2,1,2,1];
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const i=y*W+x;
+    if(d[i*4+3]===0)continue;
+    let r=0,g=0,b=0,w=0,n=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      const a=x+dx,c=y+dy;n++;
+      if(a<0||c<0||a>=W||c>=H)continue;
+      const q=(c*W+a)*4;
+      if(d[q+3]<8)continue;
+      const kw=k[n-1];
+      r+=d[q]*kw;g+=d[q+1]*kw;b+=d[q+2]*kw;w+=kw;
+    }
+    if(!w)continue;
+    blur[i*3]=r/w;blur[i*3+1]=g/w;blur[i*3+2]=b/w;
+  }
+  for(let i=0;i<N;i++){
+    if(d[i*4+3]===0)continue;
+    for(let c=0;c<3;c++){
+      const v=d[i*4+c]+amount*(d[i*4+c]-blur[i*3+c]);
+      d[i*4+c]=v<0?0:v>255?255:v;
+    }
+  }
+}
+function enhance(d,W,H,factor){
+  decontaminate(d,W,H);
+  bilateral(d,W,H,26,1.6);
+  const dW=Math.round(W*factor),dH=Math.round(H*factor);
+  const out=factor===1?d:resize(d,W,H,dW,dH);
+  unsharp(out,dW,dH,factor>1?0.55:0.35);
+  return {out,dW,dH};
+}
+
+/* ================= вход воркера ================= */
+onmessage=e=>{
+  const m=e.data;
+  if(m.cmd==='enhance'){
+    const d=new Uint8ClampedArray(m.rgba);
+    post(0.96,'Чистим кайму и повышаем резкость');
+    const r=enhance(d,m.W,m.H,m.factor);
+    postMessage({type:'enhanced',rgba:r.out.buffer,W:r.dW,H:r.dH},[r.out.buffer]);
+    return;
+  }
+  if(m.cmd==='start'){
+    post(0.04,'Анализ контраста');
+    prepare(m);
+    post(0.10,'Строим цветовые модели');
+    initModels();
+    run(m.iters,0.14,0.58,true);
+    post(0.74,'Ищем фоновые карманы');
+    carveToHard();
+    run(2,0.78,0.12);
+    post(0.90,'Чистим маску');
+    cleanup();
+    S.ready=true;
+    postMessage({type:'done',mask:S.mask.slice()});
+    return;
+  }
+  if(m.cmd==='refine'&&S&&S.ready){
+    S.tune=m.tune;
+    if(m.clearHard)S.hardBG.fill(0);
+    const backup=S.mask.slice();
+    post(0.10,'Учитываем правку');
+    run(m.iters,0.15,0.73);
+    post(0.90,'Чистим маску');
+    cleanup();
+    let area=0;for(let i=0;i<S.n;i++)area+=S.mask[i];
+    if(area<Math.max(150,0.01*S.rect.w*S.rect.h)){        // правка выкосила персонажа — откат
+      S.mask.set(backup);
+      postMessage({type:'done',mask:S.mask.slice(),reverted:true});
+    }else postMessage({type:'done',mask:S.mask.slice()});
+  }
+};
+</script>
+
 <script>
 (function(){
-  // ID пользователя, которому разрешён доступ к боту.
   var ALLOWED_USER_ID = 1781692500;
 
   var tg = window.Telegram ? window.Telegram.WebApp : null;
 
-  // Стек экранов — нужен, чтобы нативная кнопка "Назад" в Telegram
-  // всегда возвращала на предыдущий экран, а не закрывала mini app.
   var screenStack = [];
 
-  // ============================================================
-  //  Локальное хранилище (IndexedDB)
-  //  Метаданные вырезок, сами картинки (blob) и папки хранятся
-  //  в разных сторах, чтобы список из тысяч вырезок листался мгновенно,
-  //  а сами картинки подгружались лениво, только когда попадают в экран.
-  // ============================================================
   var DB_NAME = 'cutsStorage';
   var DB_VERSION = 2;
   var META_STORE = 'meta';
@@ -1192,16 +2175,13 @@
     }
   }
 
-  // Открыть новый экран поверх текущего (с возвратом по кнопке "Назад").
   function navigateTo(id){
     screenStack.push(id);
     render();
   }
 
-  // Вернуться на один экран назад. Сначала закрываем любые открытые
-  // поверх экрана элементы (просмотр картинки, попап фильтра, модалку),
-  // и только потом переключаем сами экраны.
   function goBack(){
+    if (cutBusy) return;                     
     if (imageViewerOpenState){ closeImageViewer(); return; }
     if (filterOpenState){ closeFilterPopover(); return; }
     var overlay = document.getElementById('modal-overlay');
@@ -1486,28 +2466,30 @@
     } catch(e){ return false; }
   }
 
+  function saveBlob(blob, fileName, viewerFallback){
+    var file = null;
+    try { file = new File([blob], fileName, { type: blob.type || 'image/png' }); } catch(e){}
+
+    var canShare = file && navigator.share && navigator.canShare &&
+                   navigator.canShare({ files: [file] });
+
+    if (canShare){
+      navigator.share({ files: [file] }).then(function(){
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      }).catch(function(err){
+        if (err && err.name === 'AbortError') return;
+        if (!saveViaLink(blob, fileName) && viewerFallback) viewerFallback();
+      });
+      return;
+    }
+    if (isAppleWebView()){ if (viewerFallback) viewerFallback(); return; }
+    if (!saveViaLink(blob, fileName) && viewerFallback) viewerFallback();
+  }
+
   function downloadCut(item){
     dbGetBlob(item.id).then(function(blob){
       if (!blob) return;
-      var fileName = cutFileName(item, blob);
-      var file = null;
-      try { file = new File([blob], fileName, { type: blob.type || 'image/png' }); } catch(e){}
-
-      var canShare = file && navigator.share && navigator.canShare &&
-                     navigator.canShare({ files: [file] });
-
-      if (canShare){
-        navigator.share({ files: [file] }).then(function(){
-          if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        }).catch(function(err){
-          if (err && err.name === 'AbortError') return;
-          if (!saveViaLink(blob, fileName)) openImageViewerForId(item.id, true);
-        });
-        return;
-      }
-
-      if (isAppleWebView()){ openImageViewerForId(item.id, true); return; }
-      if (!saveViaLink(blob, fileName)) openImageViewerForId(item.id, true);
+      saveBlob(blob, cutFileName(item, blob), function(){ openImageViewerForId(item.id, true); });
     }).catch(function(){});
   }
 
@@ -2095,8 +3077,334 @@
     }).catch(function(){});
   }
 
-  // --- Первичная загрузка вырезок из локального хранилища ---
   loadCutsFromDB();
+
+  var CUT_PROC_MAX = 700, CUT_PIX_CAP = 820000, CUT_ITERS = 8, CUT_RENDER_CAP = 1800;
+  var CUT_EDGE_LO = 0.32, CUT_EDGE_SPAN = 0.36;
+
+  var cutImg = null, cutScale = 1, cutSel = null, cutStart = null, cutDragging = false;
+  var cutWorker = null, cutPw = 0, cutPh = 0, cutCrop = null;
+  var cutResultBlob = null, cutResultUrl = null, cutBusy = false;
+
+  var cutFileInput   = document.getElementById('cutout-file-input');
+  var cutView        = document.getElementById('cutout-view');
+  var cutOverlayCvs  = document.getElementById('cutout-overlay');
+  var cutNextBtn     = document.getElementById('btn-cutout-next');
+  var cutReselectBtn = document.getElementById('btn-cutout-reselect');
+
+  function cutKillWorker(){ if (cutWorker){ cutWorker.terminate(); cutWorker = null; } }
+
+  function cutShowProgress(on, text){
+    cutBusy = !!on;
+    var el = document.getElementById('cutout-progress');
+    if (el) el.classList.toggle('hidden', !on);
+    if (on){
+      var fill = document.getElementById('cutout-progress-fill');
+      if (fill) fill.style.width = '3%';
+      var st = document.getElementById('cutout-progress-status');
+      if (st) st.textContent = text || 'Готовим картинку…';
+    }
+  }
+  function cutSetProgress(p, text){
+    var fill = document.getElementById('cutout-progress-fill');
+    if (fill) fill.style.width = Math.round(p * 100) + '%';
+    var st = document.getElementById('cutout-progress-status');
+    if (st && text) st.textContent = text + '…';
+  }
+
+  // --- холст и рамка ---
+  function cutFitCanvas(){
+    var stage = document.getElementById('cutout-stage');
+    var maxW = stage.parentNode.clientWidth || window.innerWidth - 36;
+    var maxH = Math.max(180, Math.round((window.innerHeight || 640) * 0.34));
+    cutScale = Math.min(1, maxW / cutImg.width, maxH / cutImg.height);
+    var w = Math.round(cutImg.width * cutScale), h = Math.round(cutImg.height * cutScale);
+    cutView.width = w; cutView.height = h;
+    cutOverlayCvs.width = w; cutOverlayCvs.height = h;
+    cutOverlayCvs.style.width = w + 'px'; cutOverlayCvs.style.height = h + 'px';
+    cutView.getContext('2d').drawImage(cutImg, 0, 0, w, h);
+    cutRedraw();
+  }
+  function cutRedraw(){
+    var c = cutOverlayCvs.getContext('2d');
+    c.clearRect(0, 0, cutOverlayCvs.width, cutOverlayCvs.height);
+    if (!cutSel) return;
+    c.fillStyle = 'rgba(239,60,49,0.28)';
+    c.fillRect(cutSel.x, cutSel.y, cutSel.w, cutSel.h);
+    c.strokeStyle = '#ef3c31'; c.lineWidth = 2;
+    c.strokeRect(cutSel.x + 1, cutSel.y + 1, cutSel.w - 2, cutSel.h - 2);
+  }
+  function cutPos(e){
+    var r = cutOverlayCvs.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(cutOverlayCvs.width,  (e.clientX - r.left) * cutOverlayCvs.width  / r.width)),
+      y: Math.max(0, Math.min(cutOverlayCvs.height, (e.clientY - r.top)  * cutOverlayCvs.height / r.height))
+    };
+  }
+  function cutUpdateSelUI(){
+    var has = !!(cutSel && cutSel.w >= 12 && cutSel.h >= 12);
+    if (cutReselectBtn) cutReselectBtn.classList.toggle('hidden', !has);
+    if (cutNextBtn) cutNextBtn.classList.toggle('hidden', !has);
+  }
+
+  if (cutOverlayCvs){
+    cutOverlayCvs.addEventListener('pointerdown', function(e){
+      if (cutBusy || !cutImg) return;
+      cutOverlayCvs.setPointerCapture(e.pointerId);
+      cutStart = cutPos(e); cutDragging = true; cutSel = null;
+      cutRedraw(); cutUpdateSelUI();
+    });
+    cutOverlayCvs.addEventListener('pointermove', function(e){
+      if (!cutDragging) return;
+      var p = cutPos(e);
+      cutSel = { x: Math.min(cutStart.x, p.x), y: Math.min(cutStart.y, p.y),
+                 w: Math.abs(p.x - cutStart.x), h: Math.abs(p.y - cutStart.y) };
+      cutRedraw();
+    });
+    cutOverlayCvs.addEventListener('pointerup', function(){
+      if (!cutDragging) return;
+      cutDragging = false;
+      if (cutSel && (cutSel.w < 12 || cutSel.h < 12)) cutSel = null;
+      cutRedraw(); cutUpdateSelUI();
+      if (cutSel && tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    });
+  }
+
+  // --- воркер ---
+  function cutMakeWorker(){
+    cutKillWorker();
+    var blob = new Blob([document.getElementById('workerSrc').textContent], { type:'text/javascript' });
+    cutWorker = new Worker(URL.createObjectURL(blob));
+    cutWorker.onmessage = function(ev){
+      var m = ev.data;
+      if (m.type === 'progress'){ cutSetProgress(m.p, m.t); }
+      else if (m.type === 'done'){ cutSetProgress(0.92, 'Уточняем края'); setTimeout(function(){ cutRender(m.mask); }, 20); }
+      else if (m.type === 'enhanced'){ cutShowResult(new Uint8ClampedArray(m.rgba), m.W, m.H); }
+    };
+    cutWorker.onerror = function(){
+      cutShowProgress(false);
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+    };
+  }
+
+  // --- запуск сегментации по выбранной рамке ---
+  function cutRunFull(){
+    if (!cutImg || !cutSel) return;
+    cutShowProgress(true, 'Анализ контраста');
+
+    var IW = cutImg.width, IH = cutImg.height;
+    var rx = cutSel.x / cutScale, ry = cutSel.y / cutScale,
+        rw = cutSel.w / cutScale, rh = cutSel.h / cutScale;
+
+    var pad = Math.max(10, Math.round(Math.max(rw, rh) * 0.18));
+    var cx = Math.max(0, Math.round(rx - pad)), cy = Math.max(0, Math.round(ry - pad));
+    var cw = Math.min(IW - cx, Math.round(rw + 2*pad)), ch = Math.min(IH - cy, Math.round(rh + 2*pad));
+    cutCrop = { cx:cx, cy:cy, cw:cw, ch:ch };
+
+    var k = Math.min(1, CUT_PROC_MAX / Math.max(cw, ch));
+    var W = Math.max(24, Math.round(cw*k)), H = Math.max(24, Math.round(ch*k));
+    if (W*H > CUT_PIX_CAP){ var s = Math.sqrt(CUT_PIX_CAP/(W*H)); W = Math.round(W*s); H = Math.round(H*s); }
+    cutPw = W; cutPh = H;
+
+    var tmp = document.createElement('canvas'); tmp.width = W; tmp.height = H;
+    var tc = tmp.getContext('2d', { willReadFrequently:true });
+    tc.imageSmoothingQuality = 'high';
+    tc.drawImage(cutImg, cx, cy, cw, ch, 0, 0, W, H);
+    var data = tc.getImageData(0, 0, W, H).data;
+    var rgb = new Float32Array(W*H*3);
+    for (var i = 0; i < W*H; i++){ rgb[i*3]=data[i*4]; rgb[i*3+1]=data[i*4+1]; rgb[i*3+2]=data[i*4+2]; }
+
+    var rect = { x: Math.max(0, Math.round((rx-cx)*W/cw)), y: Math.max(0, Math.round((ry-cy)*H/ch)),
+                 w: Math.round(rw*W/cw), h: Math.round(rh*H/ch) };
+    rect.w = Math.min(rect.w, W - rect.x); rect.h = Math.min(rect.h, H - rect.y);
+
+    cutMakeWorker();
+    cutWorker.postMessage({ cmd:'start', rgb:rgb, w:W, h:H, rect:rect, iters:CUT_ITERS,
+      tune:{ fgBias:0, minFrac:0.02, open:false, carve:1.0, geoBG:1.6, geoFG:1.2 } }, [rgb.buffer]);
+  }
+
+  // --- альфа по исходным пикселям (направляемый фильтр) ---
+  function cutBoxBlur(src, w, h, r){
+    var tmp = new Float32Array(w*h), out = new Float32Array(w*h), x, y, acc, add, rem;
+    for (y = 0; y < h; y++){
+      acc = 0; var row = y*w;
+      for (x = 0; x <= r && x < w; x++) acc += src[row+x];
+      for (x = 0; x < w; x++){
+        tmp[row+x] = acc / (Math.min(w-1, x+r) - Math.max(0, x-r) + 1);
+        add = x+r+1; rem = x-r;
+        if (add < w) acc += src[row+add];
+        if (rem >= 0) acc -= src[row+rem];
+      }
+    }
+    for (x = 0; x < w; x++){
+      acc = 0;
+      for (y = 0; y <= r && y < h; y++) acc += tmp[y*w+x];
+      for (y = 0; y < h; y++){
+        out[y*w+x] = acc / (Math.min(h-1, y+r) - Math.max(0, y-r) + 1);
+        add = y+r+1; rem = y-r;
+        if (add < h) acc += tmp[add*w+x];
+        if (rem >= 0) acc -= tmp[rem*w+x];
+      }
+    }
+    return out;
+  }
+
+  function cutRender(mask){
+    var c = cutCrop, cw = c.cw, ch = c.ch;
+    var s = Math.min(1, CUT_RENDER_CAP / Math.max(cw, ch));
+    var W = Math.max(1, Math.round(cw*s)), H = Math.max(1, Math.round(ch*s));
+
+    var cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+    var ctx = cvs.getContext('2d', { willReadFrequently:true });
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(cutImg, c.cx, c.cy, cw, ch, 0, 0, W, H);
+    var id = ctx.getImageData(0, 0, W, H), d = id.data;
+
+    var guide = new Float32Array(W*H), rough = new Float32Array(W*H);
+    var sx = cutPw / W, sy = cutPh / H, x, y, i, p;
+    for (y = 0; y < H; y++){
+      var my = Math.min(cutPh-1, (y*sy)|0);
+      for (x = 0; x < W; x++){
+        i = y*W+x; p = i*4;
+        guide[i] = (0.299*d[p] + 0.587*d[p+1] + 0.114*d[p+2]) / 255;
+        rough[i] = mask[my*cutPw + Math.min(cutPw-1, (x*sx)|0)];
+      }
+    }
+    var r = Math.max(2, Math.round(1/Math.max(sx, sy)) + 2), eps = 1e-4;
+    var II = new Float32Array(W*H), IP = new Float32Array(W*H);
+    for (i = 0; i < W*H; i++){ II[i] = guide[i]*guide[i]; IP[i] = guide[i]*rough[i]; }
+    var mI = cutBoxBlur(guide,W,H,r), mP = cutBoxBlur(rough,W,H,r),
+        mII = cutBoxBlur(II,W,H,r), mIP = cutBoxBlur(IP,W,H,r);
+    var A = new Float32Array(W*H), B = new Float32Array(W*H);
+    for (i = 0; i < W*H; i++){
+      var varI = mII[i]-mI[i]*mI[i], cov = mIP[i]-mI[i]*mP[i];
+      A[i] = cov/(varI+eps); B[i] = mP[i]-A[i]*mI[i];
+    }
+    var mA = cutBoxBlur(A,W,H,r), mB = cutBoxBlur(B,W,H,r);
+
+    var x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++){
+      i = y*W+x;
+      var a = mA[i]*guide[i] + mB[i];
+      a = (a - CUT_EDGE_LO) / CUT_EDGE_SPAN; a = a < 0 ? 0 : a > 1 ? 1 : a;
+      a = a*a*(3-2*a);
+      d[i*4+3] = Math.round(a*255);
+      if (a > 0.02){ if (x<x0)x0=x; if (x>x1)x1=x; if (y<y0)y0=y; if (y>y1)y1=y; }
+    }
+    if (x1 < 0){
+      cutShowProgress(false);
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+      return;
+    }
+    var pd = 2;
+    x0 = Math.max(0, x0-pd); y0 = Math.max(0, y0-pd);
+    x1 = Math.min(W-1, x1+pd); y1 = Math.min(H-1, y1+pd);
+    var ow = x1-x0+1, oh = y1-y0+1;
+    var out = new Uint8ClampedArray(ow*oh*4);
+    for (y = 0; y < oh; y++){
+      var src = ((y+y0)*W + x0) * 4;
+      out.set(d.subarray(src, src + ow*4), y*ow*4);
+    }
+    var factor = Math.min(2, Math.max(1, Math.floor(2600/Math.max(ow, oh))));
+    cutWorker.postMessage({ cmd:'enhance', rgba:out.buffer, W:ow, H:oh, factor:factor }, [out.buffer]);
+  }
+
+  function cutShowResult(data, W, H){
+    var cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+    cvs.getContext('2d').putImageData(new ImageData(data, W, H), 0, 0);
+    cvs.toBlob(function(blob){
+      if (cutResultUrl){ URL.revokeObjectURL(cutResultUrl); cutResultUrl = null; }
+      cutResultBlob = blob;
+      cutResultUrl = URL.createObjectURL(blob);
+      var img = document.getElementById('cutout-result-img');
+      if (img) img.src = cutResultUrl;
+      cutShowProgress(false);
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      navigateTo('screen-cutout-result');
+    }, 'image/png');
+  }
+
+  function cutResetState(){
+    cutKillWorker();
+    cutImg = null; cutSel = null; cutStart = null; cutDragging = false;
+    cutResultBlob = null;
+    if (cutResultUrl){ URL.revokeObjectURL(cutResultUrl); cutResultUrl = null; }
+    var img = document.getElementById('cutout-result-img');
+    if (img) img.src = '';
+    cutUpdateSelUI();
+  }
+
+  function cutGoToCuts(){
+    while (screenStack.length > 1 && screenStack[screenStack.length-1] !== 'screen-cuts'){ screenStack.pop(); }
+    if (screenStack[screenStack.length-1] !== 'screen-cuts'){ screenStack = ['screen-cuts']; }
+    render();
+    cutResetState();
+  }
+
+  // --- кнопки ---
+  var btnCutsCta = document.getElementById('btn-cuts-cta');
+  if (btnCutsCta && cutFileInput){
+    btnCutsCta.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      cutFileInput.value = '';
+      cutFileInput.click();
+    });
+    cutFileInput.addEventListener('change', function(e){
+      var f = e.target.files && e.target.files[0];
+      if (!f) return;
+      var im = new Image();
+      im.onload = function(){
+        cutResetState();
+        cutImg = im;
+        navigateTo('screen-cutout-select');
+        cutFitCanvas();
+        cutUpdateSelUI();
+      };
+      im.src = URL.createObjectURL(f);
+    });
+  }
+  if (cutReselectBtn){
+    cutReselectBtn.addEventListener('click', function(){
+      if (cutBusy) return;
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      cutSel = null; cutRedraw(); cutUpdateSelUI();
+    });
+  }
+  if (cutNextBtn){
+    cutNextBtn.addEventListener('click', function(){
+      if (cutBusy || !cutSel) return;
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      cutRunFull();
+    });
+  }
+  var btnCutoutDownload = document.getElementById('btn-cutout-download');
+  if (btnCutoutDownload){
+    btnCutoutDownload.addEventListener('click', function(){
+      if (!cutResultBlob) return;
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      saveBlob(cutResultBlob, 'cutout.png', function(){
+        if (cutResultUrl) openImageViewerWithUrl(cutResultUrl, true);
+      });
+    });
+  }
+  var btnCutoutCancel = document.getElementById('btn-cutout-cancel');
+  if (btnCutoutCancel){
+    btnCutoutCancel.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      cutGoToCuts();
+    });
+  }
+  // Лайк/дизлайк пока без логики
+  ['btn-cutout-like','btn-cutout-dislike'].forEach(function(id){
+    var b = document.getElementById(id);
+    if (b) b.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    });
+  });
+
+  window.addEventListener('resize', function(){
+    if (cutImg && screenStack[screenStack.length-1] === 'screen-cutout-select'){ cutFitCanvas(); }
+  });
 
   // --- Навигация с главного экрана ---
   var btnCut = document.getElementById('btn-cut');
