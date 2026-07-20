@@ -100,6 +100,10 @@
   }
   .blockquote b{ color:var(--text-primary); font-weight:600; }
 
+  @font-face{ font-family:"Font16103"; src:url("fonts/16103.otf") format("opentype"); font-display:swap; }
+  @font-face{ font-family:"AlegreyaSC"; src:url("fonts/AlegreyaSansSC-Black.ttf") format("truetype"); font-display:swap; }
+  @font-face{ font-family:"NunitoBlack"; src:url("fonts/Nunito-Black.ttf") format("truetype"); font-display:swap; }
+
   /* --- Экран отказа в доступе --- */
   #screen-denied .blockquote{
     font-size:18px;
@@ -822,6 +826,96 @@
 
   #dislike-popover{ width:262px; }
   #dislike-popover .filter-option{ padding:12px 14px; }
+
+  /* --- Создание работы --- */
+  #screen-work-picker{ padding-bottom:0; }
+  #screen-work-build{ padding-bottom:0; }
+
+  .work-head{ flex-shrink:0; }
+  .work-canvas-box{
+    width:100%; border-radius:16px; overflow:hidden;
+    background:var(--placeholder-bg); margin-bottom:14px; line-height:0;
+  }
+  #work-canvas{ width:100%; height:auto; display:block; touch-action:none; }
+
+  .work-scroll{
+    flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch; touch-action:pan-y;
+    padding-bottom:calc(var(--safe-bottom) + 118px);
+    scrollbar-width:none;
+  }
+  .work-scroll::-webkit-scrollbar{ display:none; }
+
+  .work-panel{
+    background:var(--panel-bg); border-radius:18px;
+    padding:14px 14px; margin-bottom:12px;
+  }
+  .work-panel-flat{ background:transparent; padding:0; }
+  .work-wide-btn{ width:100%; padding:13px 0; font-size:15px; }
+
+  .work-row{
+    display:flex; align-items:center; gap:10px;
+    min-height:40px; margin-bottom:10px;
+  }
+  .work-row:last-child{ margin-bottom:0; }
+  .work-label{ flex:1; min-width:0; font-size:15px; color:var(--text-primary); }
+  .work-label small{ color:var(--search-text); font-size:12px; margin-left:6px; }
+
+  .work-color{
+    flex-shrink:0; width:38px; height:38px; padding:0;
+    border:none; border-radius:50%; background:none; overflow:hidden;
+  }
+  .work-color::-webkit-color-swatch-wrapper{ padding:0; }
+  .work-color::-webkit-color-swatch{ border:2px solid rgba(255,255,255,0.15); border-radius:50%; }
+
+  .work-stepper{
+    flex-shrink:0; display:flex; align-items:center; gap:6px;
+    background:var(--btn-cut-bg); border-radius:12px; padding:4px 6px;
+  }
+  .work-stepper button{
+    width:26px; height:26px; border:none; border-radius:8px;
+    background:transparent; color:var(--btn-cut-text); font-size:18px; font-weight:700;
+  }
+  .work-stepper button:active{ opacity:0.6; }
+  .work-stepper span{ min-width:24px; text-align:center; font-size:14px; font-weight:700; color:#fff; }
+
+  .work-slider-row{ display:flex; align-items:center; gap:8px; }
+  .work-slider-row .work-label{ flex:0 0 auto; max-width:44%; }
+  .work-mini{ flex-shrink:0; color:var(--btn-cut-text); font-size:17px; font-weight:700; width:16px; text-align:center; }
+  .work-slider{
+    flex:1; min-width:0; height:26px; -webkit-appearance:none; appearance:none;
+    background:transparent;
+  }
+  .work-slider::-webkit-slider-runnable-track{ height:5px; border-radius:3px; background:#5c7f8c; }
+  .work-slider::-webkit-slider-thumb{
+    -webkit-appearance:none; width:26px; height:26px; margin-top:-10px;
+    border-radius:50%; background:#fff; border:none;
+  }
+  .work-slider::-moz-range-track{ height:5px; border-radius:3px; background:#5c7f8c; }
+  .work-slider::-moz-range-thumb{ width:26px; height:26px; border:none; border-radius:50%; background:#fff; }
+
+  .work-layer{ background:var(--panel-bg); border-radius:18px; padding:14px; margin-bottom:12px; }
+  .work-layer.off{ opacity:0.5; }
+  .work-layer-head{ display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .work-layer-name{
+    flex:1; min-width:0; font-size:15px; font-weight:700; color:#fff;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .work-layer-num{ color:var(--search-text); font-weight:600; margin-right:4px; }
+
+  .work-text-input{
+    width:100%; background:var(--search-bg); color:var(--text-primary);
+    border:none; border-radius:12px; padding:12px 14px; font-size:15px;
+    margin-bottom:10px; outline:none; font-family:inherit;
+    -webkit-user-select:text; user-select:text;
+  }
+  .work-select{
+    flex-shrink:0; background:var(--search-bg); color:var(--text-primary);
+    border:none; border-radius:10px; padding:9px 12px; font-size:14px;
+    font-family:inherit; outline:none; max-width:56%;
+  }
+  .work-section-head{ display:flex; align-items:center; gap:10px; margin:6px 0 12px; }
+  .work-section-title{ flex:1; font-size:18px; font-weight:700; color:#fff; }
 </style>
 </head>
 <body>
@@ -976,6 +1070,81 @@
     </div>
   </div>
 
+  <!-- Создание работы: шаг 1 — выбор картинок -->
+  <div id="screen-work-picker" class="screen">
+    <div class="cuts-header">
+      <div class="cuts-title-row">
+        <h2 class="cutout-title" style="margin:0">Создание работы&nbsp;- <span>выберите картинки</span></h2>
+      </div>
+      <div class="cuts-title-row">
+        <button class="pill-btn" id="btn-work-filter" type="button">фильтровать</button>
+        <button class="icon-btn icon-btn-green" id="btn-work-folders" type="button" aria-label="Папки">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+        </button>
+        <div class="picker-selected-count" id="work-selected-count">выбрано: 0</div>
+      </div>
+      <div class="search-bar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="search-input" id="work-search-input" type="text" placeholder="Поиск" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="search-clear hidden" id="work-search-clear" type="button" aria-label="Очистить">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="cuts-scroll">
+      <div class="cuts-grid" id="work-picker-grid"></div>
+      <div class="cuts-empty hidden" id="work-picker-empty">
+        <div class="cuts-empty-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+        </div>
+        <div class="cuts-empty-title">Нет вырезок</div>
+        <div class="cuts-empty-text">Сначала добавьте картинки на экране «Вырезать»</div>
+      </div>
+    </div>
+
+    <div class="cuts-bottombar">
+      <button class="cta-btn" id="btn-work-next" type="button" style="width:100%" disabled>Далее</button>
+    </div>
+  </div>
+
+  <!-- Создание работы: шаг 2 — формирование -->
+  <div id="screen-work-build" class="screen">
+    <div class="work-head">
+      <h2 class="cutout-title" style="margin:4px 0 12px">Создание работы&nbsp;- <span>формирование</span></h2>
+      <div class="work-canvas-box">
+        <canvas id="work-canvas" width="1280" height="720"></canvas>
+      </div>
+    </div>
+
+    <div class="work-scroll" id="work-scroll">
+      <!-- фон -->
+      <div class="work-panel">
+        <div class="work-row">
+          <span class="work-label">цвет фона</span>
+          <input type="color" class="work-color" id="work-bg-color" value="#ffffff">
+        </div>
+      </div>
+
+      <!-- тексты -->
+      <div id="work-text-list"></div>
+      <div class="work-panel work-panel-flat">
+        <button class="pill-btn pill-btn-success work-wide-btn" id="btn-work-add-text" type="button">добавить ещё один текст</button>
+      </div>
+
+      <!-- картинки -->
+      <div class="work-section-head">
+        <span class="work-section-title">Редактирование слоёв</span>
+        <button class="pill-btn pill-btn-success" id="btn-work-add-image" type="button">+ картинка</button>
+      </div>
+      <div id="work-layer-list"></div>
+    </div>
+
+    <div class="cuts-bottombar">
+      <button class="cta-btn" id="btn-work-download" type="button" style="width:100%">Скачать</button>
+    </div>
+  </div>
+
   <!-- Окно ожидания вырезания -->
   <div id="cutout-progress" class="cutout-progress hidden">
     <div class="cutout-progress-card">
@@ -1036,6 +1205,13 @@
       <div class="modal-actions">
         <button class="modal-btn modal-btn-cancel" id="confirm-update-no-btn" type="button">Нет</button>
         <button class="modal-btn modal-btn-primary" id="confirm-update-yes-btn" type="button">Да</button>
+      </div>
+    </div>
+    <div id="modal-work-reset" class="modal-card hidden">
+      <p class="modal-message">Вы уверены, что хотите сбросить работу?</p>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-cancel" id="work-reset-no-btn" type="button">Нет</button>
+        <button class="modal-btn modal-btn-danger" id="work-reset-yes-btn" type="button">Да</button>
       </div>
     </div>
   </div>
@@ -1974,7 +2150,7 @@ onmessage=e=>{
 
 <script>
 (function(){
-  var APP_VERSION = '0.0.1(4)';
+  var APP_VERSION = '0.0.1(5)';
 
   var ALLOWED_USER_ID = 1781692500;
 
@@ -2258,6 +2434,11 @@ onmessage=e=>{
     if (filterOpenState){ closeFilterPopover(); return; }
     var overlay = document.getElementById('modal-overlay');
     if (overlay && !overlay.classList.contains('hidden')){ closeModals(); return; }
+    if (screenStack[screenStack.length-1] === 'screen-work-build' &&
+        (workLayers.length || workTexts.length)){
+      showModal('modal-work-reset');
+      return;
+    }
     if (screenStack.length > 1){
       screenStack.pop();
       render();
@@ -2877,7 +3058,8 @@ onmessage=e=>{
     });
   }
 
-  var MODAL_IDS = ['modal-upload','modal-delete','modal-folder-name','modal-save-cut','modal-confirm-update'];
+  var MODAL_IDS = ['modal-upload','modal-delete','modal-folder-name','modal-save-cut',
+                   'modal-confirm-update','modal-work-reset'];
 
   function showModal(id){
     var overlay = document.getElementById('modal-overlay');
@@ -3780,6 +3962,486 @@ onmessage=e=>{
     if (cutImg && screenStack[screenStack.length-1] === 'screen-cutout-select'){ cutFitCanvas(); }
   });
 
+  // ============================================================
+  //  Создание работы: холст 1280x720, слои картинок и текста
+  // ============================================================
+  var WORK_W = 1280, WORK_H = 720;
+
+  var WORK_FONTS = [
+    { id:'Font16103',   label:'16103' },
+    { id:'AlegreyaSC',  label:'Alegreya Sans SC Black' },
+    { id:'NunitoBlack', label:'Nunito Black' }
+  ];
+
+  var workSelection = {};          // id вырезки -> true (экран выбора)
+  var workPickerMode = 'new';      // 'new' — новая работа, 'add' — дозагрузка слоёв
+  var workBg = '#ffffff';
+  var workLayers = [];             // картинки: {id,name,img,scale,x,y,outline,outlineColor,enabled}
+  var workTexts  = [];             // тексты: {text,font,size,color,outline,outlineColor,skew,x,y,enabled}
+  var workCanvas = document.getElementById('work-canvas');
+  var workDragTarget = null, workDragOff = null;
+
+  // --- выбор картинок ---
+  function workUpdateSelectedCount(){
+    var n = Object.keys(workSelection).length;
+    var el = document.getElementById('work-selected-count');
+    if (el) el.textContent = 'выбрано: ' + n;
+    var btn = document.getElementById('btn-work-next');
+    if (btn) btn.disabled = (n === 0);
+  }
+
+  function workRenderPicker(){
+    var grid = document.getElementById('work-picker-grid');
+    var empty = document.getElementById('work-picker-empty');
+    if (!grid) return;
+
+    if (cutsMeta.length === 0){
+      grid.innerHTML = ''; grid.classList.add('hidden');
+      if (empty) empty.classList.remove('hidden');
+      return;
+    }
+    if (empty) empty.classList.add('hidden');
+    grid.classList.remove('hidden');
+
+    var input = document.getElementById('work-search-input');
+    var query = input ? input.value : '';
+    var sorted = getSortedCuts();
+    var filtered = query.trim()
+      ? sorted.filter(function(it){ return matchesQuery(it.name, query); })
+      : sorted;
+
+    if (filtered.length === 0){
+      grid.innerHTML = '<div class="cuts-no-results">Ничего не найдено</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < filtered.length; i++){
+      var it = filtered[i];
+      html += '<div class="pick-card' + (workSelection[it.id] ? ' selected' : '') + '" data-id="' + it.id + '">' +
+                '<span class="cut-tag">' + escapeHtml(it.name) + '</span>' +
+              '</div>';
+    }
+    grid.innerHTML = html;
+    attachLazyObserver('#work-picker-grid .pick-card[data-id]',
+      document.querySelector('#screen-work-picker .cuts-scroll'), null);
+  }
+
+  function openWorkPicker(mode){
+    workPickerMode = mode || 'new';
+    if (workPickerMode === 'new'){ workSelection = {}; }
+    else {
+      // Дозагрузка: уже добавленные слои отмечены, чтобы их не продублировать.
+      workSelection = {};
+      workLayers.forEach(function(l){ workSelection[l.id] = true; });
+    }
+    var input = document.getElementById('work-search-input');
+    if (input) input.value = '';
+    workUpdateSearchClear();
+    workUpdateSelectedCount();
+    workRenderPicker();
+    var next = document.getElementById('btn-work-next');
+    if (next) next.textContent = workPickerMode === 'add' ? 'Добавить' : 'Далее';
+    navigateTo('screen-work-picker');
+  }
+
+  function workUpdateSearchClear(){
+    var input = document.getElementById('work-search-input');
+    var btn = document.getElementById('work-search-clear');
+    if (!input || !btn) return;
+    btn.classList.toggle('hidden', input.value.length === 0);
+  }
+
+  // Выбор целой папки: все её картинки отмечаются разом.
+  function workToggleFolder(folderId){
+    var folder = foldersMeta.filter(function(f){ return f.id === folderId; })[0];
+    if (!folder) return;
+    var ids = (folder.cutIds || []).filter(function(id){
+      return cutsMeta.some(function(c){ return c.id === id; });
+    });
+    if (!ids.length) return;
+    var allOn = ids.every(function(id){ return workSelection[id]; });
+    ids.forEach(function(id){
+      if (allOn) delete workSelection[id]; else workSelection[id] = true;
+    });
+    workUpdateSelectedCount();
+    workRenderPicker();
+  }
+
+  // --- сборка слоёв ---
+  function workLoadImage(id){
+    return dbGetBlob(id).then(function(blob){
+      if (!blob) return null;
+      return new Promise(function(resolve){
+        var im = new Image();
+        im.onload = function(){ resolve(im); };
+        im.onerror = function(){ resolve(null); };
+        im.src = URL.createObjectURL(blob);
+      });
+    });
+  }
+
+  function workBuildFromSelection(){
+    var ids = Object.keys(workSelection);
+    var existing = {};
+    workLayers.forEach(function(l){ existing[l.id] = l; });
+
+    Promise.all(ids.map(function(id){
+      if (existing[id]) return existing[id];
+      var meta = cutsMeta.filter(function(c){ return c.id === id; })[0];
+      return workLoadImage(id).then(function(img){
+        if (!img) return null;
+        return { id:id, name:(meta ? meta.name : id), img:img,
+                 scale:1, x:0.5, y:0.5, outline:0, outlineColor:'#ffffff', enabled:true };
+      });
+    })).then(function(list){
+      workLayers = list.filter(Boolean);
+      workAutoLayout();
+      workRenderControls();
+      workDraw();
+      if (screenStack[screenStack.length-1] !== 'screen-work-build'){
+        navigateTo('screen-work-build');
+      }
+    });
+  }
+
+  // Раскладываем картинки в ряд по центру — стартовая расстановка.
+  function workAutoLayout(){
+    var n = workLayers.length;
+    if (!n) return;
+    workLayers.forEach(function(l, i){
+      if (l.placed) return;
+      l.x = (i + 0.5) / n;
+      l.y = 0.55;
+      l.placed = true;
+    });
+  }
+
+  // --- отрисовка ---
+  function workLayerBox(l){
+    // Базовый размер: картинка вписывается в 62% высоты холста при scale=1.
+    var base = (WORK_H * 0.62) / l.img.height;
+    var w = l.img.width * base * l.scale;
+    var h = l.img.height * base * l.scale;
+    return { w:w, h:h, x:l.x*WORK_W - w/2, y:l.y*WORK_H - h/2 };
+  }
+
+  function workDraw(){
+    if (!workCanvas) return;
+    var ctx = workCanvas.getContext('2d');
+    ctx.save();
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.fillStyle = workBg;
+    ctx.fillRect(0, 0, WORK_W, WORK_H);
+
+    workLayers.forEach(function(l){
+      if (!l.enabled || !l.img) return;
+      var b = workLayerBox(l);
+      if (l.outline > 0){
+        // Обводка силуэтом: рисуем картинку по кругу смещений, затем
+        // перекрашиваем всё в цвет обводки через source-in на буфере.
+        var pad = l.outline * 4;
+        var oc = document.createElement('canvas');
+        oc.width = Math.max(1, Math.ceil(b.w + pad*2));
+        oc.height = Math.max(1, Math.ceil(b.h + pad*2));
+        var octx = oc.getContext('2d');
+        for (var a = 0; a < 16; a++){
+          var ang = a * Math.PI / 8;
+          octx.drawImage(l.img, pad + Math.cos(ang)*pad, pad + Math.sin(ang)*pad, b.w, b.h);
+        }
+        octx.globalCompositeOperation = 'source-in';
+        octx.fillStyle = l.outlineColor;
+        octx.fillRect(0, 0, oc.width, oc.height);
+        ctx.drawImage(oc, b.x - pad, b.y - pad);
+      }
+      ctx.drawImage(l.img, b.x, b.y, b.w, b.h);
+    });
+
+    workTexts.forEach(function(t){
+      if (!t.enabled || !t.text) return;
+      ctx.save();
+      ctx.translate(t.x*WORK_W, t.y*WORK_H);
+      // Наклон шрифта — сдвиг по X, привычный "курсив вручную".
+      ctx.transform(1, 0, -Math.tan(t.skew * Math.PI/180), 1, 0, 0);
+      ctx.font = t.size + 'px "' + t.font + '", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      if (t.outline > 0){
+        ctx.lineWidth = t.outline * 2;
+        ctx.strokeStyle = t.outlineColor;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(t.text, 0, 0);
+      }
+      ctx.fillStyle = t.color;
+      ctx.fillText(t.text, 0, 0);
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+
+  // --- перетаскивание слоёв прямо по холсту ---
+  if (workCanvas){
+    workCanvas.addEventListener('pointerdown', function(e){
+      var r = workCanvas.getBoundingClientRect();
+      var px = (e.clientX - r.left) * WORK_W / r.width;
+      var py = (e.clientY - r.top)  * WORK_H / r.height;
+      for (var i = workLayers.length - 1; i >= 0; i--){
+        var l = workLayers[i];
+        if (!l.enabled) continue;
+        var b = workLayerBox(l);
+        if (px >= b.x && px <= b.x+b.w && py >= b.y && py <= b.y+b.h){
+          workDragTarget = l;
+          workDragOff = { dx: px - l.x*WORK_W, dy: py - l.y*WORK_H };
+          workCanvas.setPointerCapture(e.pointerId);
+          return;
+        }
+      }
+    });
+    workCanvas.addEventListener('pointermove', function(e){
+      if (!workDragTarget) return;
+      var r = workCanvas.getBoundingClientRect();
+      var px = (e.clientX - r.left) * WORK_W / r.width;
+      var py = (e.clientY - r.top)  * WORK_H / r.height;
+      workDragTarget.x = Math.min(1.2, Math.max(-0.2, (px - workDragOff.dx) / WORK_W));
+      workDragTarget.y = Math.min(1.2, Math.max(-0.2, (py - workDragOff.dy) / WORK_H));
+      workDraw();
+    });
+    workCanvas.addEventListener('pointerup', function(){
+      if (!workDragTarget) return;
+      workDragTarget = null;
+      workRenderControls();
+    });
+  }
+
+  // --- панели управления ---
+  function workSlider(label, hint, min, max, step, val, kind, idx, key){
+    return '<div class="work-row work-slider-row">' +
+      '<span class="work-label">' + label + (hint ? '<small>' + hint + '</small>' : '') + '</span>' +
+      '<span class="work-mini" data-nudge="-1" data-kind="' + kind + '" data-idx="' + idx + '" data-key="' + key + '">−</span>' +
+      '<input type="range" class="work-slider" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '" ' +
+             'data-kind="' + kind + '" data-idx="' + idx + '" data-key="' + key + '">' +
+      '<span class="work-mini" data-nudge="1" data-kind="' + kind + '" data-idx="' + idx + '" data-key="' + key + '">+</span>' +
+    '</div>';
+  }
+
+  function workRenderControls(){
+    // тексты
+    var tl = document.getElementById('work-text-list');
+    if (tl){
+      var th = '';
+      workTexts.forEach(function(t, i){
+        var opts = WORK_FONTS.map(function(f){
+          return '<option value="' + f.id + '"' + (t.font === f.id ? ' selected' : '') + '>' + f.label + '</option>';
+        }).join('');
+        th += '<div class="work-layer' + (t.enabled ? '' : ' off') + '">' +
+          '<div class="work-layer-head">' +
+            '<span class="work-layer-name"><span class="work-layer-num">#' + (i+1) + '</span>текст</span>' +
+            '<button class="pill-btn" type="button" data-act="toggle-text" data-idx="' + i + '">' + (t.enabled ? 'выключить' : 'включить') + '</button>' +
+            '<button class="pill-btn pill-btn-danger" type="button" data-act="del-text" data-idx="' + i + '">удалить</button>' +
+          '</div>' +
+          '<input type="text" class="work-text-input" placeholder="Введите текст" value="' + escapeHtml(t.text) + '" data-act="text-value" data-idx="' + i + '">' +
+          '<div class="work-row"><span class="work-label">шрифт</span>' +
+            '<select class="work-select" data-act="text-font" data-idx="' + i + '">' + opts + '</select></div>' +
+          '<div class="work-row"><span class="work-label">цвет текста</span>' +
+            '<input type="color" class="work-color" value="' + t.color + '" data-act="text-color" data-idx="' + i + '"></div>' +
+          '<div class="work-row"><span class="work-label">обводка<small>размер</small></span>' +
+            '<div class="work-stepper">' +
+              '<button type="button" data-act="text-outline" data-idx="' + i + '" data-delta="-1">−</button>' +
+              '<span>' + t.outline + '</span>' +
+              '<button type="button" data-act="text-outline" data-idx="' + i + '" data-delta="1">+</button>' +
+            '</div>' +
+            '<input type="color" class="work-color" value="' + t.outlineColor + '" data-act="text-outline-color" data-idx="' + i + '"></div>' +
+          workSlider('размер', 'меньше/больше', 20, 260, 1, t.size, 'text', i, 'size') +
+          workSlider('наклон', 'влево/вправо', -45, 45, 1, t.skew, 'text', i, 'skew') +
+          workSlider('положение', 'ниже/выше', 0, 1, 0.01, t.y, 'text', i, 'y') +
+        '</div>';
+      });
+      tl.innerHTML = th;
+    }
+
+    // картинки
+    var ll = document.getElementById('work-layer-list');
+    if (ll){
+      var lh = '';
+      workLayers.forEach(function(l, i){
+        lh += '<div class="work-layer' + (l.enabled ? '' : ' off') + '">' +
+          '<div class="work-layer-head">' +
+            '<span class="work-layer-name"><span class="work-layer-num">#' + (i+1) + '</span>' + escapeHtml(l.name) + '</span>' +
+            '<button class="pill-btn" type="button" data-act="toggle-layer" data-idx="' + i + '">' + (l.enabled ? 'выключить' : 'включить') + '</button>' +
+            '<button class="pill-btn pill-btn-danger" type="button" data-act="del-layer" data-idx="' + i + '">удалить</button>' +
+          '</div>' +
+          '<div class="work-row"><span class="work-label">обводка<small>размер</small></span>' +
+            '<div class="work-stepper">' +
+              '<button type="button" data-act="layer-outline" data-idx="' + i + '" data-delta="-1">−</button>' +
+              '<span>' + l.outline + '</span>' +
+              '<button type="button" data-act="layer-outline" data-idx="' + i + '" data-delta="1">+</button>' +
+            '</div>' +
+            '<input type="color" class="work-color" value="' + l.outlineColor + '" data-act="layer-outline-color" data-idx="' + i + '"></div>' +
+          workSlider('размер', 'меньше/больше', 0.15, 2.5, 0.01, l.scale, 'layer', i, 'scale') +
+          workSlider('положение', 'ниже/выше', 0, 1, 0.01, l.y, 'layer', i, 'y') +
+        '</div>';
+      });
+      ll.innerHTML = lh;
+    }
+  }
+
+  // --- события панелей ---
+  var workScrollEl = document.getElementById('work-scroll');
+  if (workScrollEl){
+    workScrollEl.addEventListener('input', function(e){
+      var el = e.target;
+      var idx = parseInt(el.getAttribute('data-idx'), 10);
+      var act = el.getAttribute('data-act');
+      if (el.classList.contains('work-slider')){
+        var kind = el.getAttribute('data-kind'), key = el.getAttribute('data-key');
+        var arr = kind === 'text' ? workTexts : workLayers;
+        if (arr[idx]) arr[idx][key] = parseFloat(el.value);
+        workDraw();
+        return;
+      }
+      if (act === 'text-value'){ workTexts[idx].text = el.value; workDraw(); }
+      else if (act === 'text-color'){ workTexts[idx].color = el.value; workDraw(); }
+      else if (act === 'text-outline-color'){ workTexts[idx].outlineColor = el.value; workDraw(); }
+      else if (act === 'text-font'){ workTexts[idx].font = el.value; workDraw(); }
+      else if (act === 'layer-outline-color'){ workLayers[idx].outlineColor = el.value; workDraw(); }
+    });
+
+    workScrollEl.addEventListener('click', function(e){
+      var btn = e.target.closest ? e.target.closest('[data-act],[data-nudge]') : null;
+      if (!btn) return;
+      var idx = parseInt(btn.getAttribute('data-idx'), 10);
+      var act = btn.getAttribute('data-act');
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+      if (btn.hasAttribute('data-nudge')){
+        var kind = btn.getAttribute('data-kind'), key = btn.getAttribute('data-key');
+        var arr = kind === 'text' ? workTexts : workLayers;
+        var slider = btn.parentNode.querySelector('.work-slider');
+        var step = parseFloat(slider.step) * (key === 'size' || key === 'skew' ? 4 : 4);
+        var v = arr[idx][key] + parseInt(btn.getAttribute('data-nudge'), 10) * step;
+        v = Math.min(parseFloat(slider.max), Math.max(parseFloat(slider.min), v));
+        arr[idx][key] = v; slider.value = v; workDraw();
+        return;
+      }
+      if (act === 'toggle-text'){ workTexts[idx].enabled = !workTexts[idx].enabled; }
+      else if (act === 'del-text'){ workTexts.splice(idx, 1); }
+      else if (act === 'text-outline'){
+        workTexts[idx].outline = Math.max(0, Math.min(20, workTexts[idx].outline + parseInt(btn.getAttribute('data-delta'), 10)));
+      }
+      else if (act === 'toggle-layer'){ workLayers[idx].enabled = !workLayers[idx].enabled; }
+      else if (act === 'del-layer'){ workLayers.splice(idx, 1); }
+      else if (act === 'layer-outline'){
+        workLayers[idx].outline = Math.max(0, Math.min(20, workLayers[idx].outline + parseInt(btn.getAttribute('data-delta'), 10)));
+      }
+      else return;
+      workRenderControls(); workDraw();
+    });
+  }
+
+  var workBgInput = document.getElementById('work-bg-color');
+  if (workBgInput){
+    workBgInput.addEventListener('input', function(){ workBg = workBgInput.value; workDraw(); });
+  }
+
+  var btnWorkAddText = document.getElementById('btn-work-add-text');
+  if (btnWorkAddText){
+    btnWorkAddText.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      workTexts.push({ text:'Текст', font:WORK_FONTS[0].id, size:96, color:'#ffffff',
+                       outline:0, outlineColor:'#000000', skew:0, x:0.5, y:0.15, enabled:true });
+      workRenderControls(); workDraw();
+    });
+  }
+
+  var btnWorkAddImage = document.getElementById('btn-work-add-image');
+  if (btnWorkAddImage){
+    btnWorkAddImage.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      openWorkPicker('add');
+    });
+  }
+
+  // --- экран выбора: события ---
+  var workGrid = document.getElementById('work-picker-grid');
+  if (workGrid){
+    workGrid.addEventListener('click', function(e){
+      var card = e.target.closest ? e.target.closest('.pick-card') : null;
+      if (!card) return;
+      var id = card.getAttribute('data-id');
+      if (workSelection[id]){ delete workSelection[id]; card.classList.remove('selected'); }
+      else { workSelection[id] = true; card.classList.add('selected'); }
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      workUpdateSelectedCount();
+    });
+  }
+  var workSearchInput = document.getElementById('work-search-input');
+  if (workSearchInput){
+    workSearchInput.addEventListener('input', function(){ workUpdateSearchClear(); workRenderPicker(); });
+  }
+  var workSearchClear = document.getElementById('work-search-clear');
+  if (workSearchClear){
+    workSearchClear.addEventListener('click', function(){
+      workSearchInput.value = ''; workUpdateSearchClear(); workRenderPicker(); workSearchInput.blur();
+    });
+  }
+  var btnWorkFilter = document.getElementById('btn-work-filter');
+  if (btnWorkFilter){
+    btnWorkFilter.addEventListener('click', function(){
+      if (filterOpenState){ closeFilterPopover(); } else { openFilterPopover(btnWorkFilter); }
+    });
+  }
+  // Кнопка папок: показываем список папок, тап по папке берёт её целиком.
+  var btnWorkFolders = document.getElementById('btn-work-folders');
+  if (btnWorkFolders){
+    btnWorkFolders.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      workFolderPickMode = true;
+      navigateTo('screen-folders');
+      renderFoldersList();
+    });
+  }
+  var workFolderPickMode = false;
+
+  var btnWorkNext = document.getElementById('btn-work-next');
+  if (btnWorkNext){
+    btnWorkNext.addEventListener('click', function(){
+      if (btnWorkNext.disabled) return;
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      if (workPickerMode === 'add') goBack();
+      workBuildFromSelection();
+    });
+  }
+
+  var btnWorkDownload = document.getElementById('btn-work-download');
+  if (btnWorkDownload){
+    btnWorkDownload.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      workDraw();
+      workCanvas.toBlob(function(blob){
+        if (!blob) return;
+        saveBlob(blob, 'work.png', function(){
+          openImageViewerWithUrl(URL.createObjectURL(blob), true);
+        });
+      }, 'image/png');
+    });
+  }
+
+  function workReset(){
+    workSelection = {}; workLayers = []; workTexts = [];
+    workBg = '#ffffff';
+    if (workBgInput) workBgInput.value = '#ffffff';
+    workRenderControls(); workDraw();
+  }
+  var workResetYes = document.getElementById('work-reset-yes-btn');
+  if (workResetYes){
+    workResetYes.addEventListener('click', function(){
+      closeModals();
+      workReset();
+      show('screen-menu');
+    });
+  }
+  var workResetNo = document.getElementById('work-reset-no-btn');
+  if (workResetNo) workResetNo.addEventListener('click', closeModals);
+
   // --- Навигация с главного экрана ---
   var btnCut = document.getElementById('btn-cut');
   var btnCreate = document.getElementById('btn-create');
@@ -3792,7 +4454,7 @@ onmessage=e=>{
   if (btnCreate){
     btnCreate.addEventListener('click', function(){
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-      // TODO: экран "Создать"
+      openWorkPicker('new');
     });
   }
 
@@ -3846,9 +4508,20 @@ onmessage=e=>{
         openImageViewerForId(imgId);
       }
     });
+
+    foldersList.addEventListener('click', function(e){
+      if (!workFolderPickMode) return;
+      if (e.target.closest && e.target.closest('[data-action]')) return;
+      var section = e.target.closest ? e.target.closest('.folder-section') : null;
+      if (!section) return;
+      if (e.target.closest && e.target.closest('.cut-image')) return;
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      workToggleFolder(section.getAttribute('data-folder-id'));
+      workFolderPickMode = false;
+      goBack();
+    }, true);
   }
 
-  // --- Поиск по имени картинки + крестик очистки (экран "Все вырезки") ---
   var searchInputEl = document.getElementById('search-input');
   var searchClearBtn = document.getElementById('search-clear');
 
