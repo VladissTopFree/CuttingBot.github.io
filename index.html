@@ -758,6 +758,7 @@
     padding-bottom:calc(var(--safe-bottom) + 150px);
     scrollbar-width:none;
   }
+  .cutout-body > *{ flex-shrink:0; }
   .cutout-body > .blockquote{ width:100%; align-self:stretch; }
   .cutout-body::-webkit-scrollbar{ display:none; }
 
@@ -812,6 +813,9 @@
   .cutout-progress-status{ color:var(--text-secondary); font-size:13px; min-height:18px; margin-bottom:14px; }
   .cutout-progress-bar{ height:4px; border-radius:2px; background:#2a2a30; overflow:hidden; }
   .cutout-progress-bar>div{ height:100%; width:0; background:var(--accent); transition:width 0.25s; }
+
+  #dislike-popover{ width:262px; }
+  #dislike-popover .filter-option{ padding:12px 14px; }
 </style>
 </head>
 <body>
@@ -1011,6 +1015,15 @@
         <button class="modal-btn modal-btn-primary" id="folder-name-create-btn" type="button" disabled>Создать</button>
       </div>
     </div>
+    <div id="modal-save-cut" class="modal-card hidden">
+      <h3 class="modal-title">Сохранить вырезку</h3>
+      <div class="upload-dropzone has-image" id="save-cut-preview"></div>
+      <input type="text" id="save-cut-name-input" class="name-input" placeholder="Имя картинки" maxlength="40">
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-cancel" id="save-cut-cancel-btn" type="button">Отмена</button>
+        <button class="modal-btn modal-btn-primary" id="save-cut-submit-btn" type="button" disabled>Сохранить</button>
+      </div>
+    </div>
   </div>
 
   <div id="filter-backdrop" class="filter-backdrop hidden"></div>
@@ -1030,7 +1043,15 @@
     </div>
   </div>
 
-  <!-- Полноэкранный просмотр картинки -->
+  <div id="dislike-popover" class="filter-popover hidden">
+    <div class="filter-popover-label">нужно переделать</div>
+    <div class="filter-option" data-fix="hq"><span>Поднять картинки</span></div>
+    <div class="filter-option" data-fix="lost"><span>Потерялись части</span></div>
+    <div class="filter-option" data-fix="bgleft"><span>Захватило фон</span></div>
+    <div class="filter-option" data-fix="halo"><span>По бокам</span></div>
+    <div class="filter-option" data-fix="redo"><span>Вырезать заново</span></div>
+  </div>
+
   <div id="image-viewer" class="image-viewer hidden">
     <div class="image-viewer-backdrop"></div>
     <div class="image-viewer-stage">
@@ -1939,7 +1960,7 @@ onmessage=e=>{
 
 <script>
 (function(){
-  var APP_VERSION = '0.0.1(1)';
+  var APP_VERSION = '0.0.1(2)';
 
   var ALLOWED_USER_ID = 1781692500;
 
@@ -2207,6 +2228,7 @@ onmessage=e=>{
   function goBack(){
     if (cutBusy) return;                     
     if (imageViewerOpenState){ closeImageViewer(); return; }
+    if (dislikeOpenState){ closeDislikePopover(); return; }
     if (filterOpenState){ closeFilterPopover(); return; }
     var overlay = document.getElementById('modal-overlay');
     if (overlay && !overlay.classList.contains('hidden')){ closeModals(); return; }
@@ -2412,11 +2434,10 @@ onmessage=e=>{
     return arr;
   }
 
-  // Картинка внутри карточки не встраивается сразу: она подгружается лениво
-  // (см. loadCutImage/setupCutsObserver), когда карточка появляется на экране.
-  // Заглушка под кнопку "Переделать" убрана из разметки карточки:
-  // она понадобится позже, поэтому её стили (.cut-btn-redo) в CSS остались нетронутыми.
   function buildCutCard(item){
+    var redoBtn = item.fromCutout
+      ? '<button class="cut-btn cut-btn-redo" type="button" data-action="redo" data-id="' + item.id + '">Переделать</button>'
+      : '';
     return (
       '<div class="cut-card">' +
         '<div class="cut-image" data-id="' + item.id + '">' +
@@ -2424,6 +2445,7 @@ onmessage=e=>{
         '</div>' +
         '<div class="cut-actions">' +
           '<button class="cut-btn cut-btn-download" type="button" data-action="download" data-id="' + item.id + '">Скачать</button>' +
+          redoBtn +
           '<button class="cut-btn cut-btn-delete" type="button" data-action="delete" data-id="' + item.id + '">Удалить</button>' +
         '</div>' +
       '</div>'
@@ -2623,7 +2645,7 @@ onmessage=e=>{
   var imageViewerZoomBar = document.getElementById('image-viewer-zoom');
   var imageViewerScaleLabel = document.getElementById('image-viewer-scale');
 
-  var IV_MIN_SCALE = 1;
+  var IV_MIN_SCALE = 0.25;
   var IV_MAX_SCALE = 6;
 
   var ivScale = 1, ivTx = 0, ivTy = 0;
@@ -2792,23 +2814,19 @@ onmessage=e=>{
       var touch = e.changedTouches[0];
       var now = Date.now();
       if (now - ivLastTap < 280){
-        // Двойной тап: увеличить / вернуть исходный размер.
         clearTimeout(ivTapTimer);
         ivLastTap = 0;
-        if (ivScale > 1.01){ ivZoomTo(1, touch.clientX, touch.clientY, true); }
-        else { ivZoomTo(2.5, touch.clientX, touch.clientY, true); }
+      if (ivScale > 1.01 || ivScale < 0.99){ ivZoomTo(1, touch.clientX, touch.clientY, true); }
+      else { ivZoomTo(2.5, touch.clientX, touch.clientY, true); }
       } else {
         ivLastTap = now;
         var onBackdrop = e.target.classList && e.target.classList.contains('image-viewer-backdrop');
         ivTapTimer = setTimeout(function(){
-          // Одиночный тап закрывает просмотр, если картинка не увеличена
-          // (или если тап пришёлся мимо картинки — по затемнению).
-          if (ivScale <= 1.01 || onBackdrop) closeImageViewer();
+          if ((ivScale >= 0.99 && ivScale <= 1.01) || onBackdrop) closeImageViewer();
         }, 290);
       }
     }, { passive:true });
 
-    // Колесо мыши — для десктопа.
     imageViewerEl.addEventListener('wheel', function(e){
       e.preventDefault();
       ivZoomTo(ivScale * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX, e.clientY, false);
@@ -2833,20 +2851,18 @@ onmessage=e=>{
     });
   }
 
+  var MODAL_IDS = ['modal-upload','modal-delete','modal-folder-name','modal-save-cut'];
+
   function showModal(id){
     var overlay = document.getElementById('modal-overlay');
     overlay.classList.remove('hidden');
-    document.getElementById('modal-upload').classList.add('hidden');
-    document.getElementById('modal-delete').classList.add('hidden');
-    document.getElementById('modal-folder-name').classList.add('hidden');
+    MODAL_IDS.forEach(function(m){ document.getElementById(m).classList.add('hidden'); });
     document.getElementById(id).classList.remove('hidden');
   }
 
   function closeModals(){
     document.getElementById('modal-overlay').classList.add('hidden');
-    document.getElementById('modal-upload').classList.add('hidden');
-    document.getElementById('modal-delete').classList.add('hidden');
-    document.getElementById('modal-folder-name').classList.add('hidden');
+    MODAL_IDS.forEach(function(m){ document.getElementById(m).classList.add('hidden'); });
   }
 
   function resetUploadDropzone(){
@@ -3106,8 +3122,18 @@ onmessage=e=>{
   var versionBadgeEl = document.getElementById('app-version');
   if (versionBadgeEl) versionBadgeEl.textContent = 'v' + APP_VERSION;
 
-  var CUT_PROC_MAX = 700, CUT_PIX_CAP = 820000, CUT_ITERS = 8, CUT_RENDER_CAP = 1800;
-  var CUT_EDGE_LO = 0.32, CUT_EDGE_SPAN = 0.36;
+  var CUT_PROC_MAX = 700, CUT_PROC_HQ = 1080, CUT_PIX_CAP = 820000;
+  var CUT_ITERS = 8, CUT_REFINE_ITERS = 4;
+  var CUT_RENDER_CAP = 1800, CUT_RENDER_CAP_HQ = 2400;
+  var CUT_EDGE = [[0.32,0.36],[0.40,0.30],[0.48,0.26],[0.56,0.22]];
+  var CUT_TUNE0 = { fgBias:0, minFrac:0.02, open:false, carve:1.0, geoBG:1.6, geoFG:1.2 };
+
+  function cutCloneTune(t){ return { fgBias:t.fgBias, minFrac:t.minFrac, open:t.open,
+                                     carve:t.carve, geoBG:t.geoBG, geoFG:t.geoFG }; }
+
+  var cutTune = cutCloneTune(CUT_TUNE0), cutPrevTune = null;
+  var cutEdgeTrim = 0, cutHq = false, cutLastMask = null;
+  var dislikeOpenState = false;
 
   var cutImg = null, cutScale = 1, cutDpr = 1, cutSel = null, cutStart = null, cutDragging = false;
   var cutWorker = null, cutPw = 0, cutPh = 0, cutCrop = null;
@@ -3224,7 +3250,12 @@ onmessage=e=>{
     cutWorker.onmessage = function(ev){
       var m = ev.data;
       if (m.type === 'progress'){ cutSetProgress(m.p, m.t); }
-      else if (m.type === 'done'){ cutSetProgress(0.92, 'Уточняем края'); setTimeout(function(){ cutRender(m.mask); }, 20); }
+      else if (m.type === 'done'){
+        cutLastMask = m.mask;
+        if (m.reverted && cutPrevTune){ cutTune = cutCloneTune(cutPrevTune); cutPrevTune = null; }
+        cutSetProgress(0.92, m.reverted ? 'Правка убрала бы почти всё — вернул как было' : 'Уточняем края');
+        setTimeout(function(){ cutRender(m.mask); }, 20);
+      }
       else if (m.type === 'enhanced'){ cutShowResult(new Uint8ClampedArray(m.rgba), m.W, m.H); }
     };
     cutWorker.onerror = function(){
@@ -3247,7 +3278,7 @@ onmessage=e=>{
     var cw = Math.min(IW - cx, Math.round(rw + 2*pad)), ch = Math.min(IH - cy, Math.round(rh + 2*pad));
     cutCrop = { cx:cx, cy:cy, cw:cw, ch:ch };
 
-    var k = Math.min(1, CUT_PROC_MAX / Math.max(cw, ch));
+    var k = Math.min(1, (cutHq ? CUT_PROC_HQ : CUT_PROC_MAX) / Math.max(cw, ch));
     var W = Math.max(24, Math.round(cw*k)), H = Math.max(24, Math.round(ch*k));
     if (W*H > CUT_PIX_CAP){ var s = Math.sqrt(CUT_PIX_CAP/(W*H)); W = Math.round(W*s); H = Math.round(H*s); }
     cutPw = W; cutPh = H;
@@ -3265,11 +3296,17 @@ onmessage=e=>{
     rect.w = Math.min(rect.w, W - rect.x); rect.h = Math.min(rect.h, H - rect.y);
 
     cutMakeWorker();
-    cutWorker.postMessage({ cmd:'start', rgb:rgb, w:W, h:H, rect:rect, iters:CUT_ITERS,
-      tune:{ fgBias:0, minFrac:0.02, open:false, carve:1.0, geoBG:1.6, geoFG:1.2 } }, [rgb.buffer]);
+    cutWorker.postMessage({ cmd:'start', rgb:rgb, w:W, h:H, rect:rect,
+                            iters:CUT_ITERS, tune:cutTune }, [rgb.buffer]);
   }
 
-  // --- альфа по исходным пикселям (направляемый фильтр) ---
+  function cutRunRefine(clearHard){
+    if (!cutWorker || !cutLastMask) return;
+    cutShowProgress(true, 'Учитываем правку');
+    cutWorker.postMessage({ cmd:'refine', iters:CUT_REFINE_ITERS,
+                            tune:cutTune, clearHard:!!clearHard });
+  }
+
   function cutBoxBlur(src, w, h, r){
     var tmp = new Float32Array(w*h), out = new Float32Array(w*h), x, y, acc, add, rem;
     for (y = 0; y < h; y++){
@@ -3297,7 +3334,7 @@ onmessage=e=>{
 
   function cutRender(mask){
     var c = cutCrop, cw = c.cw, ch = c.ch;
-    var s = Math.min(1, CUT_RENDER_CAP / Math.max(cw, ch));
+    var s = Math.min(1, (cutHq ? CUT_RENDER_CAP_HQ : CUT_RENDER_CAP) / Math.max(cw, ch));
     var W = Math.max(1, Math.round(cw*s)), H = Math.max(1, Math.round(ch*s));
 
     var cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
@@ -3327,12 +3364,14 @@ onmessage=e=>{
       A[i] = cov/(varI+eps); B[i] = mP[i]-A[i]*mI[i];
     }
     var mA = cutBoxBlur(A,W,H,r), mB = cutBoxBlur(B,W,H,r);
+    var edge = CUT_EDGE[Math.min(cutEdgeTrim, CUT_EDGE.length - 1)];
+    var edgeLo = edge[0], edgeSpan = edge[1];
 
     var x0 = W, y0 = H, x1 = -1, y1 = -1;
     for (y = 0; y < H; y++) for (x = 0; x < W; x++){
       i = y*W+x;
       var a = mA[i]*guide[i] + mB[i];
-      a = (a - CUT_EDGE_LO) / CUT_EDGE_SPAN; a = a < 0 ? 0 : a > 1 ? 1 : a;
+      a = (a - edgeLo) / edgeSpan; a = a < 0 ? 0 : a > 1 ? 1 : a;
       a = a*a*(3-2*a);
       d[i*4+3] = Math.round(a*255);
       if (a > 0.02){ if (x<x0)x0=x; if (x>x1)x1=x; if (y<y0)y0=y; if (y>y1)y1=y; }
@@ -3373,7 +3412,9 @@ onmessage=e=>{
   function cutResetState(){
     cutKillWorker();
     cutImg = null; cutSel = null; cutStart = null; cutDragging = false;
-    cutResultBlob = null;
+    cutResultBlob = null; cutLastMask = null;
+    cutTune = cutCloneTune(CUT_TUNE0); cutPrevTune = null;
+    cutEdgeTrim = 0; cutHq = false;
     if (cutResultUrl){ URL.revokeObjectURL(cutResultUrl); cutResultUrl = null; }
     var img = document.getElementById('cutout-result-img');
     if (img) img.src = '';
@@ -3450,12 +3491,127 @@ onmessage=e=>{
       cutGoToCuts();
     });
   }
-  ['btn-cutout-like','btn-cutout-dislike'].forEach(function(id){
-    var b = document.getElementById(id);
-    if (b) b.addEventListener('click', function(){
-      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+  function openSaveCutModal(){
+    if (!cutResultBlob || !cutResultUrl) return;
+    var preview = document.getElementById('save-cut-preview');
+    if (preview) preview.innerHTML = '<img src="' + cutResultUrl + '" alt="">';
+    var nameInput = document.getElementById('save-cut-name-input');
+    if (nameInput) nameInput.value = '';
+    updateSaveCutSubmitState();
+    showModal('modal-save-cut');
+  }
+
+  function updateSaveCutSubmitState(){
+    var nameInput = document.getElementById('save-cut-name-input');
+    var btn = document.getElementById('save-cut-submit-btn');
+    if (btn) btn.disabled = !(cutResultBlob && nameInput && nameInput.value.trim().length > 0);
+  }
+
+  function submitSaveCut(){
+    var nameInput = document.getElementById('save-cut-name-input');
+    var nameVal = nameInput ? nameInput.value.trim() : '';
+    if (!cutResultBlob || !nameVal) return;
+    var id = 'cut_' + (cutIdCounter++);
+    var meta = { id: id, name: nameVal, createdAt: Date.now(), fromCutout: true };
+    dbAddCut(meta, cutResultBlob).then(function(){
+      cutsMeta.push(meta);
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      closeModals();
+      var searchInput = document.getElementById('search-input');
+      if (searchInput){ searchInput.value = ''; updateSearchClearVisibility(); }
+      renderCutsList();
+      cutGoToCuts();
+    }).catch(function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
     });
-  });
+  }
+
+  var btnCutoutLike = document.getElementById('btn-cutout-like');
+  if (btnCutoutLike){
+    btnCutoutLike.addEventListener('click', function(){
+      if (cutBusy) return;
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      openSaveCutModal();
+    });
+  }
+  var saveCutNameInput = document.getElementById('save-cut-name-input');
+  if (saveCutNameInput) saveCutNameInput.addEventListener('input', updateSaveCutSubmitState);
+  var saveCutCancelBtn = document.getElementById('save-cut-cancel-btn');
+  if (saveCutCancelBtn) saveCutCancelBtn.addEventListener('click', closeModals);
+  var saveCutSubmitBtn = document.getElementById('save-cut-submit-btn');
+  if (saveCutSubmitBtn){
+    saveCutSubmitBtn.addEventListener('click', function(){
+      if (saveCutSubmitBtn.disabled) return;
+      submitSaveCut();
+    });
+  }
+
+  function openDislikePopover(anchorBtn){
+    var pop = document.getElementById('dislike-popover');
+    var rect = anchorBtn.getBoundingClientRect();
+    pop.classList.remove('hidden');
+    pop.style.top = Math.max(12, rect.top - pop.offsetHeight - 10) + 'px';
+    pop.style.right = Math.max(18, window.innerWidth - rect.right) + 'px';
+    document.getElementById('filter-backdrop').classList.remove('hidden');
+    dislikeOpenState = true;
+  }
+  function closeDislikePopover(){
+    document.getElementById('dislike-popover').classList.add('hidden');
+    document.getElementById('filter-backdrop').classList.add('hidden');
+    dislikeOpenState = false;
+  }
+
+  function applyCutFix(fix){
+    if (fix === 'lost'){
+      cutPrevTune = cutCloneTune(cutTune);
+      cutTune = { fgBias: Math.min(3.6, cutTune.fgBias + 1.2), minFrac: 0.006, open: false,
+                  carve: Math.min(2.4, cutTune.carve + 0.5),
+                  geoBG: Math.max(0, cutTune.geoBG - 0.6),
+                  geoFG: Math.min(3, cutTune.geoFG + 0.4) };
+      cutRunRefine(true);
+    } else if (fix === 'bgleft'){
+      cutPrevTune = cutCloneTune(cutTune);
+      cutTune = { fgBias: Math.max(-3.6, cutTune.fgBias - 1.2), minFrac: 0.10, open: true,
+                  carve: Math.max(0.4, cutTune.carve - 0.3),
+                  geoBG: Math.min(3.6, cutTune.geoBG + 0.8),
+                  geoFG: Math.max(0, cutTune.geoFG - 0.3) };
+      cutRunRefine();
+    } else if (fix === 'halo'){
+      if (cutEdgeTrim >= CUT_EDGE.length - 1) return;   
+      cutEdgeTrim++;
+      cutShowProgress(true, 'Поджимаем края');
+      setTimeout(function(){ cutRender(cutLastMask); }, 20);
+    } else if (fix === 'hq'){
+      if (cutHq) return;                                 
+      cutHq = true;
+      cutRunFull();
+    } else if (fix === 'redo'){
+      cutTune = cutCloneTune(CUT_TUNE0); cutPrevTune = null;
+      cutEdgeTrim = 0; cutHq = false; cutLastMask = null;
+      cutSel = null;
+      goBack();                                          
+      cutRedraw(); cutUpdateSelUI();
+    }
+  }
+
+  var btnCutoutDislike = document.getElementById('btn-cutout-dislike');
+  if (btnCutoutDislike){
+    btnCutoutDislike.addEventListener('click', function(){
+      if (cutBusy) return;
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      if (dislikeOpenState){ closeDislikePopover(); } else { openDislikePopover(btnCutoutDislike); }
+    });
+  }
+  var dislikePopoverEl = document.getElementById('dislike-popover');
+  if (dislikePopoverEl){
+    dislikePopoverEl.addEventListener('click', function(e){
+      var opt = e.target.closest ? e.target.closest('.filter-option') : null;
+      if (!opt) return;
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      closeDislikePopover();
+      applyCutFix(opt.getAttribute('data-fix'));
+    });
+  }
 
   window.addEventListener('resize', function(){
     if (cutImg && screenStack[screenStack.length-1] === 'screen-cutout-select'){ cutFitCanvas(); }
@@ -3574,7 +3730,6 @@ onmessage=e=>{
     });
   }
 
-  // --- Клики по карточкам на экране "Все вырезки": открыть картинку крупно / скачать / удалить ---
   var cutsGrid = document.getElementById('cuts-grid');
   if (cutsGrid){
     cutsGrid.addEventListener('click', function(e){
@@ -3587,6 +3742,7 @@ onmessage=e=>{
         var action = actionBtn.getAttribute('data-action');
         if (action === 'download'){ downloadCut(item); }
         else if (action === 'delete'){ requestDelete(item.id); }
+        else if (action === 'redo'){ }
         return;
       }
       var imageEl = e.target.closest ? e.target.closest('.cut-image') : null;
@@ -3730,9 +3886,11 @@ onmessage=e=>{
     });
   }
   if (filterBackdropEl){
-    filterBackdropEl.addEventListener('click', closeFilterPopover);
+    filterBackdropEl.addEventListener('click', function(){
+      if (dislikeOpenState) closeDislikePopover();
+      closeFilterPopover();
+    });
   }
-
   function updateFilterCheckmarks(){
     var opts = document.querySelectorAll('.filter-option');
     for (var i = 0; i < opts.length; i++){
