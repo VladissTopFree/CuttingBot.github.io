@@ -786,6 +786,12 @@
     padding:15px 46px; border-radius:16px; font-size:20px; font-weight:600;
   }
   .cutout-download:active{ opacity:0.85; }
+  .cutout-undo{
+    border:none; background:var(--btn-cancel-bg); color:var(--btn-cancel-text);
+    padding:11px 22px; border-radius:14px; font-size:14px; font-weight:600;
+  }
+  .cutout-undo:active{ opacity:0.85; }
+  .cutout-undo:disabled{ opacity:0.4; }
   .cutout-vote{
     flex-shrink:0; width:52px; height:52px; border-radius:50%; border:none;
     background:var(--fab-bg); color:#fff; display:flex; align-items:center; justify-content:center;
@@ -953,6 +959,7 @@
     <div class="cutout-body">
       <div class="cutout-result-box" id="cutout-result-box"><img id="cutout-result-img" alt="" draggable="false"></div>
       <button class="cutout-download" id="btn-cutout-download" type="button">скачать</button>
+      <button class="cutout-undo hidden" id="btn-cutout-undo" type="button">← вернуть шаг назад</button>
       <div class="blockquote">
         Если Вас устраивает, как обрезана картинка, поставьте <b>лайк</b>.<br>
         Если нет — нажмите <b>дизлайк</b> и укажите, что именно не так.
@@ -1024,6 +1031,13 @@
         <button class="modal-btn modal-btn-primary" id="save-cut-submit-btn" type="button" disabled>Сохранить</button>
       </div>
     </div>
+    <div id="modal-confirm-update" class="modal-card hidden">
+      <p class="modal-message">Вы хотите обновить картинку?</p>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-cancel" id="confirm-update-no-btn" type="button">Нет</button>
+        <button class="modal-btn modal-btn-primary" id="confirm-update-yes-btn" type="button">Да</button>
+      </div>
+    </div>
   </div>
 
   <div id="filter-backdrop" class="filter-backdrop hidden"></div>
@@ -1045,7 +1059,7 @@
 
   <div id="dislike-popover" class="filter-popover hidden">
     <div class="filter-popover-label">нужно переделать</div>
-    <div class="filter-option" data-fix="hq"><span>Поднять картинки</span></div>
+    <div class="filter-option" data-fix="hq"><span>Поднять качество</span></div>
     <div class="filter-option" data-fix="lost"><span>Потерялись части</span></div>
     <div class="filter-option" data-fix="bgleft"><span>Захватило фон</span></div>
     <div class="filter-option" data-fix="halo"><span>По бокам</span></div>
@@ -1960,7 +1974,7 @@ onmessage=e=>{
 
 <script>
 (function(){
-  var APP_VERSION = '0.0.1(2)';
+  var APP_VERSION = '0.0.1(3)';
 
   var ALLOWED_USER_ID = 1781692500;
 
@@ -2026,12 +2040,24 @@ onmessage=e=>{
     });
   }
 
+  function dbPutBlob(id, blob){
+    return openDatabase().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(BLOB_STORE, 'readwrite');
+        tx.objectStore(BLOB_STORE).put({ id: id, blob: blob });
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
   function dbDeleteCut(id){
     return openDatabase().then(function(db){
       return new Promise(function(resolve, reject){
         var tx = db.transaction([META_STORE, BLOB_STORE], 'readwrite');
         tx.objectStore(META_STORE).delete(id);
         tx.objectStore(BLOB_STORE).delete(id);
+        tx.objectStore(BLOB_STORE).delete(id + ':src');
         tx.oncomplete = function(){ resolve(); };
         tx.onerror = function(e){ reject(e.target.error); };
       });
@@ -2851,7 +2877,7 @@ onmessage=e=>{
     });
   }
 
-  var MODAL_IDS = ['modal-upload','modal-delete','modal-folder-name','modal-save-cut'];
+  var MODAL_IDS = ['modal-upload','modal-delete','modal-folder-name','modal-save-cut','modal-confirm-update'];
 
   function showModal(id){
     var overlay = document.getElementById('modal-overlay');
@@ -3135,6 +3161,10 @@ onmessage=e=>{
   var cutEdgeTrim = 0, cutHq = false, cutLastMask = null;
   var dislikeOpenState = false;
 
+  var cutSourceBlob = null, cutSrcRect = null;
+  var cutRedoTargetId = null;
+  var cutHistory = [];
+
   var cutImg = null, cutScale = 1, cutDpr = 1, cutSel = null, cutStart = null, cutDragging = false;
   var cutWorker = null, cutPw = 0, cutPh = 0, cutCrop = null;
   var cutResultBlob = null, cutResultUrl = null, cutBusy = false;
@@ -3151,6 +3181,7 @@ onmessage=e=>{
     cutBusy = !!on;
     var el = document.getElementById('cutout-progress');
     if (el) el.classList.toggle('hidden', !on);
+    cutUpdateUndoBtn();
     if (on){
       var fill = document.getElementById('cutout-progress-fill');
       if (fill) fill.style.width = '3%';
@@ -3165,7 +3196,46 @@ onmessage=e=>{
     if (st && text) st.textContent = text + '…';
   }
 
-  // --- холст и рамка ---
+  function cutUpdateUndoBtn(){
+    var btn = document.getElementById('btn-cutout-undo');
+    if (!btn) return;
+    btn.classList.toggle('hidden', cutHistory.length === 0);
+    btn.disabled = cutBusy;
+  }
+
+  function cutPushHistory(renderOnly){
+    cutHistory.push({ tune: cutCloneTune(cutTune), edgeTrim: cutEdgeTrim,
+                      hq: cutHq, renderOnly: !!renderOnly });
+    if (cutHistory.length > 20) cutHistory.shift();
+    cutUpdateUndoBtn();
+  }
+
+  function cutUndo(){
+    if (!cutHistory.length || cutBusy) return;
+    var st = cutHistory.pop();
+    cutTune = cutCloneTune(st.tune);
+    cutEdgeTrim = st.edgeTrim;
+    var hqWas = cutHq;
+    cutHq = st.hq;
+    cutPrevTune = null;
+    cutUpdateUndoBtn();
+
+    if (st.renderOnly && cutLastMask && hqWas === cutHq){
+      cutShowProgress(true, 'Возвращаем прошлый вариант');
+      setTimeout(function(){ cutRender(cutLastMask); }, 20);
+    } else {
+      cutRunFull();
+    }
+  }
+
+  var btnCutoutUndo = document.getElementById('btn-cutout-undo');
+  if (btnCutoutUndo){
+    btnCutoutUndo.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      cutUndo();
+    });
+  }
+
   function cutFitCanvas(){
     var stage = document.getElementById('cutout-stage');
     var maxW = stage.parentNode.clientWidth || (window.innerWidth - 36);
@@ -3264,14 +3334,17 @@ onmessage=e=>{
     };
   }
 
-  // --- запуск сегментации по выбранной рамке ---
   function cutRunFull(){
-    if (!cutImg || !cutSel) return;
+    if (!cutImg || (!cutSel && !cutSrcRect)) return;
     cutShowProgress(true, 'Анализ контраста');
 
     var IW = cutImg.width, IH = cutImg.height;
-    var rx = cutSel.x / cutScale, ry = cutSel.y / cutScale,
-        rw = cutSel.w / cutScale, rh = cutSel.h / cutScale;
+    if (!cutSrcRect && cutSel){
+      cutSrcRect = { x: cutSel.x / cutScale, y: cutSel.y / cutScale,
+                     w: cutSel.w / cutScale, h: cutSel.h / cutScale };
+    }
+    if (!cutSrcRect) return;
+    var rx = cutSrcRect.x, ry = cutSrcRect.y, rw = cutSrcRect.w, rh = cutSrcRect.h;
 
     var pad = Math.max(10, Math.round(Math.max(rw, rh) * 0.18));
     var cx = Math.max(0, Math.round(rx - pad)), cy = Math.max(0, Math.round(ry - pad));
@@ -3415,6 +3488,8 @@ onmessage=e=>{
     cutResultBlob = null; cutLastMask = null;
     cutTune = cutCloneTune(CUT_TUNE0); cutPrevTune = null;
     cutEdgeTrim = 0; cutHq = false;
+    cutSourceBlob = null; cutSrcRect = null; cutRedoTargetId = null;
+    cutHistory = []; cutUpdateUndoBtn();
     if (cutResultUrl){ URL.revokeObjectURL(cutResultUrl); cutResultUrl = null; }
     var img = document.getElementById('cutout-result-img');
     if (img) img.src = '';
@@ -3443,6 +3518,7 @@ onmessage=e=>{
       im.onload = function(){
         cutResetState();
         cutImg = im;
+        cutSourceBlob = f;             
         navigateTo('screen-cutout-select');
         cutFitCanvas();
         cutUpdateSelUI();
@@ -3454,7 +3530,7 @@ onmessage=e=>{
     cutReselectBtn.addEventListener('click', function(){
       if (cutBusy) return;
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-      cutSel = null; cutRedraw(); cutUpdateSelUI();
+      cutSel = null; cutSrcRect = null; cutRedraw(); cutUpdateSelUI();
     });
   }
   if (cutNextBtn){
@@ -3512,8 +3588,13 @@ onmessage=e=>{
     var nameVal = nameInput ? nameInput.value.trim() : '';
     if (!cutResultBlob || !nameVal) return;
     var id = 'cut_' + (cutIdCounter++);
-    var meta = { id: id, name: nameVal, createdAt: Date.now(), fromCutout: true };
+    var meta = { id: id, name: nameVal, createdAt: Date.now(), fromCutout: true,
+                 cutRect: cutSrcRect, cutTune: cutCloneTune(cutTune),
+                 cutEdgeTrim: cutEdgeTrim, cutHq: cutHq };
+    var srcBlob = cutSourceBlob;
     dbAddCut(meta, cutResultBlob).then(function(){
+      return srcBlob ? dbPutBlob(id + ':src', srcBlob) : null;
+    }).then(function(){
       cutsMeta.push(meta);
       if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       closeModals();
@@ -3531,7 +3612,8 @@ onmessage=e=>{
     btnCutoutLike.addEventListener('click', function(){
       if (cutBusy) return;
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-      openSaveCutModal();
+      if (cutRedoTargetId){ showModal('modal-confirm-update'); }
+      else { openSaveCutModal(); }
     });
   }
   var saveCutNameInput = document.getElementById('save-cut-name-input');
@@ -3563,32 +3645,37 @@ onmessage=e=>{
 
   function applyCutFix(fix){
     if (fix === 'lost'){
+      cutPushHistory(false);
       cutPrevTune = cutCloneTune(cutTune);
       cutTune = { fgBias: Math.min(3.6, cutTune.fgBias + 1.2), minFrac: 0.006, open: false,
                   carve: Math.min(2.4, cutTune.carve + 0.5),
                   geoBG: Math.max(0, cutTune.geoBG - 0.6),
                   geoFG: Math.min(3, cutTune.geoFG + 0.4) };
       cutRunRefine(true);
-    } else if (fix === 'bgleft'){
+      } else if (fix === 'bgleft'){
+      cutPushHistory(false);
       cutPrevTune = cutCloneTune(cutTune);
       cutTune = { fgBias: Math.max(-3.6, cutTune.fgBias - 1.2), minFrac: 0.10, open: true,
                   carve: Math.max(0.4, cutTune.carve - 0.3),
                   geoBG: Math.min(3.6, cutTune.geoBG + 0.8),
                   geoFG: Math.max(0, cutTune.geoFG - 0.3) };
       cutRunRefine();
-    } else if (fix === 'halo'){
+      } else if (fix === 'halo'){
       if (cutEdgeTrim >= CUT_EDGE.length - 1) return;   
+      cutPushHistory(true);
       cutEdgeTrim++;
       cutShowProgress(true, 'Поджимаем края');
       setTimeout(function(){ cutRender(cutLastMask); }, 20);
     } else if (fix === 'hq'){
       if (cutHq) return;                                 
+      cutPushHistory(false);
       cutHq = true;
       cutRunFull();
     } else if (fix === 'redo'){
       cutTune = cutCloneTune(CUT_TUNE0); cutPrevTune = null;
       cutEdgeTrim = 0; cutHq = false; cutLastMask = null;
-      cutSel = null;
+      cutHistory = []; cutUpdateUndoBtn();
+      cutSel = null; cutSrcRect = null;
       goBack();                                          
       cutRedraw(); cutUpdateSelUI();
     }
@@ -3612,6 +3699,57 @@ onmessage=e=>{
       applyCutFix(opt.getAttribute('data-fix'));
     });
   }
+
+  function startCutoutRedo(id){
+    var item = cutsMeta.filter(function(c){ return c.id === id; })[0];
+    if (!item || !item.cutRect) return;
+    dbGetBlob(id + ':src').then(function(blob){
+      if (!blob) return;                       
+      var im = new Image();
+      im.onload = function(){
+        cutResetState();
+        cutImg = im;
+        cutSourceBlob = blob;
+        cutRedoTargetId = id;
+        cutSrcRect = item.cutRect;
+        cutTune = cutCloneTune(item.cutTune || CUT_TUNE0);
+        cutEdgeTrim = item.cutEdgeTrim || 0;
+        cutHq = !!item.cutHq;
+        navigateTo('screen-cutout-result');
+        cutRunFull();
+      };
+      im.src = URL.createObjectURL(blob);
+    }).catch(function(){});
+  }
+
+  function submitRedoUpdate(){
+    var id = cutRedoTargetId;
+    var item = cutsMeta.filter(function(c){ return c.id === id; })[0];
+    if (!id || !item || !cutResultBlob){ closeModals(); return; }
+    item.cutTune = cutCloneTune(cutTune);
+    item.cutEdgeTrim = cutEdgeTrim;
+    item.cutHq = cutHq;
+    item.updatedAt = Date.now();
+    dbAddCut(item, cutResultBlob).then(function(){
+      if (imageUrlCache[id]){
+        URL.revokeObjectURL(imageUrlCache[id]);
+        delete imageUrlCache[id];
+        var li = imageLruOrder.indexOf(id);
+        if (li !== -1) imageLruOrder.splice(li, 1);
+      }
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      closeModals();
+      renderCutsList();
+      cutGoToCuts();
+    }).catch(function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+    });
+  }
+
+  var confirmUpdateYes = document.getElementById('confirm-update-yes-btn');
+  if (confirmUpdateYes) confirmUpdateYes.addEventListener('click', submitRedoUpdate);
+  var confirmUpdateNo = document.getElementById('confirm-update-no-btn');
+  if (confirmUpdateNo) confirmUpdateNo.addEventListener('click', closeModals);
 
   window.addEventListener('resize', function(){
     if (cutImg && screenStack[screenStack.length-1] === 'screen-cutout-select'){ cutFitCanvas(); }
@@ -3742,7 +3880,7 @@ onmessage=e=>{
         var action = actionBtn.getAttribute('data-action');
         if (action === 'download'){ downloadCut(item); }
         else if (action === 'delete'){ requestDelete(item.id); }
-        else if (action === 'redo'){ }
+        else if (action === 'redo'){ startCutoutRedo(item.id); }
         return;
       }
       var imageEl = e.target.closest ? e.target.closest('.cut-image') : null;
