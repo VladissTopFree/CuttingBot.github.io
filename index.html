@@ -916,6 +916,31 @@
   }
   .work-section-head{ display:flex; align-items:center; gap:10px; margin:6px 0 12px; }
   .work-section-title{ flex:1; font-size:18px; font-weight:700; color:#fff; }
+
+  .folder-pick{ border:2px solid transparent; transition:border-color 0.15s ease; }
+  .folder-pick.selected{ border-color:var(--accent); }
+  .folder-pick-mark{ flex-shrink:0; color:var(--accent); font-size:13px; font-weight:700; }
+  .folder-pick .cut-image{ pointer-events:none; }
+  .work-colorset{ flex-shrink:0; display:flex; align-items:center; gap:10px; }
+  .work-swatch{
+    width:34px; height:34px; border-radius:50%; border:2px solid transparent;
+    padding:0; position:relative; flex-shrink:0;
+  }
+  .work-swatch.on{ border-color:var(--accent); }
+  .work-swatch-white{ background:#ffffff; }
+  .work-swatch-black{ background:#000000; }
+  .work-swatch-custom{
+    background:conic-gradient(#ff5f6d,#ffc371,#47e6b1,#3fa7ff,#a86bff,#ff5f6d);
+    overflow:hidden;
+  }
+  .work-swatch-custom input{
+    position:absolute; inset:0; width:100%; height:100%;
+    opacity:0; border:none; padding:0;
+  }
+  .work-swatch-custom span{
+    position:absolute; inset:7px; border-radius:50%;
+    border:2px solid rgba(255,255,255,0.85);
+  }
 </style>
 </head>
 <body>
@@ -1016,6 +1041,7 @@
       <div class="cuts-title-row">
         <h2>Все папки</h2>
         <button class="pill-btn pill-btn-success" id="btn-folders-create" type="button">Создать папку</button>
+        <button class="pill-btn pill-btn-success hidden" id="btn-folders-done" type="button">готово</button>
       </div>
     </div>
 
@@ -1120,9 +1146,8 @@
     <div class="work-scroll" id="work-scroll">
       <!-- фон -->
       <div class="work-panel">
-        <div class="work-row">
+        <div class="work-row" id="work-bg-row">
           <span class="work-label">цвет фона</span>
-          <input type="color" class="work-color" id="work-bg-color" value="#ffffff">
         </div>
       </div>
 
@@ -2150,7 +2175,7 @@ onmessage=e=>{
 
 <script>
 (function(){
-  var APP_VERSION = '0.0.1(5)';
+  var APP_VERSION = '0.0.1(6)';
 
   var ALLOWED_USER_ID = 1781692500;
 
@@ -2440,6 +2465,7 @@ onmessage=e=>{
       return;
     }
     if (screenStack.length > 1){
+      if (screenStack[screenStack.length-1] === 'screen-folders'){ workFolderPickMode = false; }
       screenStack.pop();
       render();
     }
@@ -3277,7 +3303,31 @@ onmessage=e=>{
     );
   }
 
+  // В режиме сбора работы папку можно только выбрать: кнопки правки прячем.
   function buildFolderSection(folder, index){
+    if (workFolderPickMode){
+      var ids0 = (folder.cutIds || []).filter(function(id){
+        return cutsMeta.some(function(c){ return c.id === id; });
+      });
+      var items0 = ids0.map(function(id){
+        return cutsMeta.filter(function(c){ return c.id === id; })[0];
+      }).filter(Boolean);
+      var on = workSelectedFolders[folder.id] ? ' selected' : '';
+      var body0 = items0.length
+        ? '<div class="cuts-grid cuts-grid-3">' + items0.map(function(item){
+            return '<div class="cut-image" data-id="' + item.id + '">' +
+                     '<span class="cut-tag">' + escapeHtml(item.name) + '</span></div>';
+          }).join('') + '</div>'
+        : '<div class="folder-section-empty">Папка пуста</div>';
+      return (
+        '<div class="folder-section folder-pick' + on + '" data-folder-id="' + folder.id + '">' +
+          '<div class="folder-section-header">' +
+            '<span class="folder-section-title">#' + (index + 1) + ' ' + escapeHtml(folder.name) + '</span>' +
+            '<span class="folder-pick-mark">' + (workSelectedFolders[folder.id] ? 'выбрана' : 'выбрать') + '</span>' +
+          '</div>' + body0 +
+        '</div>'
+      );
+    }
     var ids = folder.cutIds || [];
     // Показываем только те вырезки, которые ещё существуют
     // (на случай, если файл удалили на экране "Все вырезки").
@@ -3307,6 +3357,13 @@ onmessage=e=>{
       var container = document.getElementById('folders-list');
       var emptyState = document.getElementById('folders-empty');
       if (!container) return;
+
+      var head = document.querySelector('#screen-folders .cuts-title-row h2');
+      if (head) head.textContent = workFolderPickMode ? 'Выберите папку' : 'Все папки';
+      var createBtn = document.getElementById('btn-folders-create');
+      if (createBtn) createBtn.classList.toggle('hidden', !!workFolderPickMode);
+      var doneBtn = document.getElementById('btn-folders-done');
+      if (doneBtn) doneBtn.classList.toggle('hidden', !workFolderPickMode);
 
       if (foldersMeta.length === 0){
         container.innerHTML = '';
@@ -3973,8 +4030,8 @@ onmessage=e=>{
     { id:'NunitoBlack', label:'Nunito Black' }
   ];
 
-  var workSelection = {};          // id вырезки -> true (экран выбора)
-  var workPickerMode = 'new';      // 'new' — новая работа, 'add' — дозагрузка слоёв
+  var workSelection = {};          // id вырезки -> true (итоговый набор, без дублей)
+  var workManualSelection = {};    // что выбрано тапом по карточке, а не папкой  var workPickerMode = 'new';      // 'new' — новая работа, 'add' — дозагрузка слоёв
   var workBg = '#ffffff';
   var workLayers = [];             // картинки: {id,name,img,scale,x,y,outline,outlineColor,enabled}
   var workTexts  = [];             // тексты: {text,font,size,color,outline,outlineColor,skew,x,y,enabled}
@@ -4028,11 +4085,12 @@ onmessage=e=>{
 
   function openWorkPicker(mode){
     workPickerMode = mode || 'new';
-    if (workPickerMode === 'new'){ workSelection = {}; }
+    workSelectedFolders = {};
+    if (workPickerMode === 'new'){ workSelection = {}; workManualSelection = {}; }
     else {
       // Дозагрузка: уже добавленные слои отмечены, чтобы их не продублировать.
-      workSelection = {};
-      workLayers.forEach(function(l){ workSelection[l.id] = true; });
+      workSelection = {}; workManualSelection = {};
+      workLayers.forEach(function(l){ workSelection[l.id] = true; workManualSelection[l.id] = true; });
     }
     var input = document.getElementById('work-search-input');
     if (input) input.value = '';
@@ -4051,18 +4109,34 @@ onmessage=e=>{
     btn.classList.toggle('hidden', input.value.length === 0);
   }
 
-  // Выбор целой папки: все её картинки отмечаются разом.
-  function workToggleFolder(folderId){
+  var workSelectedFolders = {};
+  var workFolderPickMode = false; 
+
+  function workFolderIds(folderId){
     var folder = foldersMeta.filter(function(f){ return f.id === folderId; })[0];
-    if (!folder) return;
-    var ids = (folder.cutIds || []).filter(function(id){
+    if (!folder) return [];
+    return (folder.cutIds || []).filter(function(id){
       return cutsMeta.some(function(c){ return c.id === id; });
     });
+  }
+
+  function workToggleFolder(folderId){
+    var ids = workFolderIds(folderId);
     if (!ids.length) return;
-    var allOn = ids.every(function(id){ return workSelection[id]; });
-    ids.forEach(function(id){
-      if (allOn) delete workSelection[id]; else workSelection[id] = true;
-    });
+
+    if (workSelectedFolders[folderId]){
+      delete workSelectedFolders[folderId];
+      var keep = {};
+      Object.keys(workSelectedFolders).forEach(function(fid){
+        workFolderIds(fid).forEach(function(id){ keep[id] = true; });
+      });
+      ids.forEach(function(id){
+        if (!keep[id] && !workManualSelection[id]) delete workSelection[id];
+      });
+    } else {
+      workSelectedFolders[folderId] = true;
+      ids.forEach(function(id){ workSelection[id] = true; });
+    }
     workUpdateSelectedCount();
     workRenderPicker();
   }
@@ -4160,8 +4234,7 @@ onmessage=e=>{
       if (!t.enabled || !t.text) return;
       ctx.save();
       ctx.translate(t.x*WORK_W, t.y*WORK_H);
-      // Наклон шрифта — сдвиг по X, привычный "курсив вручную".
-      ctx.transform(1, 0, -Math.tan(t.skew * Math.PI/180), 1, 0, 0);
+      if (t.italic) ctx.transform(1, 0, -Math.tan(12 * Math.PI/180), 1, 0, 0);
       ctx.font = t.size + 'px "' + t.font + '", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -4223,6 +4296,23 @@ onmessage=e=>{
     '</div>';
   }
 
+  // Три кружка: белый, чёрный и свой цвет через нативный пикер.
+  function workColorSet(val, act, idx){
+    var v = (val || '#ffffff').toLowerCase();
+    var isW = v === '#ffffff', isB = v === '#000000';
+    return '<div class="work-colorset">' +
+      '<button type="button" class="work-swatch work-swatch-white' + (isW ? ' on' : '') + '" ' +
+              'data-act="' + act + '" data-idx="' + idx + '" data-color="#ffffff"></button>' +
+      '<button type="button" class="work-swatch work-swatch-black' + (isB ? ' on' : '') + '" ' +
+              'data-act="' + act + '" data-idx="' + idx + '" data-color="#000000"></button>' +
+      '<label class="work-swatch work-swatch-custom' + (!isW && !isB ? ' on' : '') + '"' +
+             (!isW && !isB ? ' style="background:' + v + '"' : '') + '>' +
+        '<span></span>' +
+        '<input type="color" value="' + v + '" data-act="' + act + '" data-idx="' + idx + '">' +
+      '</label>' +
+    '</div>';
+  }
+
   function workRenderControls(){
     // тексты
     var tl = document.getElementById('work-text-list');
@@ -4242,16 +4332,18 @@ onmessage=e=>{
           '<div class="work-row"><span class="work-label">шрифт</span>' +
             '<select class="work-select" data-act="text-font" data-idx="' + i + '">' + opts + '</select></div>' +
           '<div class="work-row"><span class="work-label">цвет текста</span>' +
-            '<input type="color" class="work-color" value="' + t.color + '" data-act="text-color" data-idx="' + i + '"></div>' +
+            workColorSet(t.color, 'text-color', i) + '</div>' +
           '<div class="work-row"><span class="work-label">обводка<small>размер</small></span>' +
             '<div class="work-stepper">' +
               '<button type="button" data-act="text-outline" data-idx="' + i + '" data-delta="-1">−</button>' +
               '<span>' + t.outline + '</span>' +
               '<button type="button" data-act="text-outline" data-idx="' + i + '" data-delta="1">+</button>' +
             '</div>' +
-            '<input type="color" class="work-color" value="' + t.outlineColor + '" data-act="text-outline-color" data-idx="' + i + '"></div>' +
+            workColorSet(t.outlineColor, 'text-outline-color', i) + '</div>' +
           workSlider('размер', 'меньше/больше', 20, 260, 1, t.size, 'text', i, 'size') +
-          workSlider('наклон', 'влево/вправо', -45, 45, 1, t.skew, 'text', i, 'skew') +
+          '<div class="work-row"><span class="work-label">наклон шрифта</span>' +
+            '<button class="pill-btn' + (t.italic ? ' pill-btn-success' : '') + '" type="button" ' +
+                    'data-act="toggle-italic" data-idx="' + i + '">' + (t.italic ? 'включён' : 'выключен') + '</button></div>' +
           workSlider('положение', 'ниже/выше', 0, 1, 0.01, t.y, 'text', i, 'y') +
         '</div>';
       });
@@ -4275,7 +4367,7 @@ onmessage=e=>{
               '<span>' + l.outline + '</span>' +
               '<button type="button" data-act="layer-outline" data-idx="' + i + '" data-delta="1">+</button>' +
             '</div>' +
-            '<input type="color" class="work-color" value="' + l.outlineColor + '" data-act="layer-outline-color" data-idx="' + i + '"></div>' +
+            workColorSet(l.outlineColor, 'layer-outline-color', i) + '</div>' +
           workSlider('размер', 'меньше/больше', 0.15, 2.5, 0.01, l.scale, 'layer', i, 'scale') +
           workSlider('положение', 'ниже/выше', 0, 1, 0.01, l.y, 'layer', i, 'y') +
         '</div>';
@@ -4298,11 +4390,13 @@ onmessage=e=>{
         workDraw();
         return;
       }
-      if (act === 'text-value'){ workTexts[idx].text = el.value; workDraw(); }
-      else if (act === 'text-color'){ workTexts[idx].color = el.value; workDraw(); }
-      else if (act === 'text-outline-color'){ workTexts[idx].outlineColor = el.value; workDraw(); }
-      else if (act === 'text-font'){ workTexts[idx].font = el.value; workDraw(); }
-      else if (act === 'layer-outline-color'){ workLayers[idx].outlineColor = el.value; workDraw(); }
+      if (act === 'text-value'){ workTexts[idx].text = el.value; workDraw(); return; }
+      if (act === 'text-font'){ workTexts[idx].font = el.value; workDraw(); return; }
+      if (act === 'text-color'){ workTexts[idx].color = el.value; }
+      else if (act === 'text-outline-color'){ workTexts[idx].outlineColor = el.value; }
+      else if (act === 'layer-outline-color'){ workLayers[idx].outlineColor = el.value; }
+      else return;
+      workRenderControls(); workDraw();
     });
 
     workScrollEl.addEventListener('click', function(e){
@@ -4311,6 +4405,16 @@ onmessage=e=>{
       var idx = parseInt(btn.getAttribute('data-idx'), 10);
       var act = btn.getAttribute('data-act');
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+      // Пресетные кружки белого и чёрного.
+      var preset = btn.getAttribute('data-color');
+      if (preset){
+        if (act === 'text-color') workTexts[idx].color = preset;
+        else if (act === 'text-outline-color') workTexts[idx].outlineColor = preset;
+        else if (act === 'layer-outline-color') workLayers[idx].outlineColor = preset;
+        workRenderControls(); workDraw();
+        return;
+      }
 
       if (btn.hasAttribute('data-nudge')){
         var kind = btn.getAttribute('data-kind'), key = btn.getAttribute('data-key');
@@ -4322,7 +4426,8 @@ onmessage=e=>{
         arr[idx][key] = v; slider.value = v; workDraw();
         return;
       }
-      if (act === 'toggle-text'){ workTexts[idx].enabled = !workTexts[idx].enabled; }
+      if (act === 'toggle-italic'){ workTexts[idx].italic = !workTexts[idx].italic; }
+      else if (act === 'toggle-text'){ workTexts[idx].enabled = !workTexts[idx].enabled; }
       else if (act === 'del-text'){ workTexts.splice(idx, 1); }
       else if (act === 'text-outline'){
         workTexts[idx].outline = Math.max(0, Math.min(20, workTexts[idx].outline + parseInt(btn.getAttribute('data-delta'), 10)));
@@ -4337,9 +4442,27 @@ onmessage=e=>{
     });
   }
 
-  var workBgInput = document.getElementById('work-bg-color');
-  if (workBgInput){
-    workBgInput.addEventListener('input', function(){ workBg = workBgInput.value; workDraw(); });
+  function workRenderBgRow(){
+    var row = document.getElementById('work-bg-row');
+    if (!row) return;
+    row.innerHTML = '<span class="work-label">цвет фона</span>' + workColorSet(workBg, 'bg-color', 0);
+  }
+  workRenderBgRow();
+
+  var workBgRow = document.getElementById('work-bg-row');
+  if (workBgRow){
+    workBgRow.addEventListener('input', function(e){
+      if (e.target.getAttribute('data-act') === 'bg-color'){
+        workBg = e.target.value; workRenderBgRow(); workDraw();
+      }
+    });
+    workBgRow.addEventListener('click', function(e){
+      var b = e.target.closest ? e.target.closest('button[data-color]') : null;
+      if (!b) return;
+      workBg = b.getAttribute('data-color');
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      workRenderBgRow(); workDraw();
+    });
   }
 
   var btnWorkAddText = document.getElementById('btn-work-add-text');
@@ -4347,7 +4470,7 @@ onmessage=e=>{
     btnWorkAddText.addEventListener('click', function(){
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
       workTexts.push({ text:'Текст', font:WORK_FONTS[0].id, size:96, color:'#ffffff',
-                       outline:0, outlineColor:'#000000', skew:0, x:0.5, y:0.15, enabled:true });
+                       outline:0, outlineColor:'#000000', italic:false, x:0.5, y:0.15, enabled:true });
       workRenderControls(); workDraw();
     });
   }
@@ -4367,8 +4490,13 @@ onmessage=e=>{
       var card = e.target.closest ? e.target.closest('.pick-card') : null;
       if (!card) return;
       var id = card.getAttribute('data-id');
-      if (workSelection[id]){ delete workSelection[id]; card.classList.remove('selected'); }
-      else { workSelection[id] = true; card.classList.add('selected'); }
+      if (workSelection[id]){
+        delete workSelection[id]; delete workManualSelection[id];
+        card.classList.remove('selected');
+      } else {
+        workSelection[id] = true; workManualSelection[id] = true;
+        card.classList.add('selected');
+      }
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
       workUpdateSelectedCount();
     });
@@ -4399,8 +4527,6 @@ onmessage=e=>{
       renderFoldersList();
     });
   }
-  var workFolderPickMode = false;
-
   var btnWorkNext = document.getElementById('btn-work-next');
   if (btnWorkNext){
     btnWorkNext.addEventListener('click', function(){
@@ -4486,6 +4612,17 @@ onmessage=e=>{
     });
   }
 
+  var btnFoldersDone = document.getElementById('btn-folders-done');
+  if (btnFoldersDone){
+    btnFoldersDone.addEventListener('click', function(){
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      workFolderPickMode = false;
+      goBack();
+      workRenderPicker();
+      workUpdateSelectedCount();
+    });
+  }
+
   // --- Клики внутри списка папок: добавить картинки / удалить папку / убрать картинку / посмотреть крупно ---
   var foldersList = document.getElementById('folders-list');
   if (foldersList){
@@ -4511,14 +4648,12 @@ onmessage=e=>{
 
     foldersList.addEventListener('click', function(e){
       if (!workFolderPickMode) return;
-      if (e.target.closest && e.target.closest('[data-action]')) return;
+      e.stopPropagation();
       var section = e.target.closest ? e.target.closest('.folder-section') : null;
       if (!section) return;
-      if (e.target.closest && e.target.closest('.cut-image')) return;
       if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
       workToggleFolder(section.getAttribute('data-folder-id'));
-      workFolderPickMode = false;
-      goBack();
+      renderFoldersList();
     }, true);
   }
 
