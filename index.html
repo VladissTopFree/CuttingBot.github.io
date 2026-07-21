@@ -2173,7 +2173,7 @@ onmessage=e=>{
 (function(){
   var APP_VERSION = '0.0.1(8)';
 
-  var ALLOWED_USER_ID = 1781692500, 5235860053;
+  var ALLOWED_USER_IDS = [1781692500, 5235860053]; 
 
   var tg = window.Telegram ? window.Telegram.WebApp : null;
 
@@ -2513,7 +2513,7 @@ onmessage=e=>{
     syncSafeArea();
 
     var userId = tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id;
-    show(userId === ALLOWED_USER_ID ? 'screen-menu' : 'screen-denied');
+    show(ALLOWED_USER_IDS.indexOf(userId) !== -1 ? 'screen-menu' : 'screen-denied');
   } else {
     show('screen-denied');
   }
